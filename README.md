@@ -23,6 +23,21 @@ cd thermal_engineering
 pip install -r requirements.txt
 ```
 
+## Project Structure
+
+```
+thermal_engineering/
+├── app.py                    # Local development server
+├── api/
+│   └── index.py             # Vercel serverless function
+├── templates/
+│   └── index.html           # HTML template
+├── 20251211_LPE_CC_Data_Export.csv
+├── requirements.txt
+├── vercel.json              # Vercel configuration
+└── README.md
+```
+
 ## Usage
 
 1. Run the Flask application:

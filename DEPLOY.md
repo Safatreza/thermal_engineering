@@ -65,14 +65,30 @@ The project includes:
 ## Important Notes
 
 ### Data File Size
-The CSV file (20251211_LPE_CC_Data_Export.csv) is ~32,000 rows. Vercel has deployment limits:
+The CSV file (20251211_LPE_CC_Data_Export.csv) is ~32,000 rows (~2MB). Vercel has deployment limits:
 - **Free tier**: 100MB max deployment size
 - **Serverless function**: 50MB max (including dependencies)
 
-If you encounter size issues:
-1. Consider sampling the data for demo purposes
-2. Upgrade to Vercel Pro
-3. Host the CSV file externally (S3, GitHub Releases, etc.)
+**Important Note**: The large dataset may cause cold start delays (5-10 seconds) on first load. Consider:
+
+**Option A: Keep Full Dataset** (Current Setup)
+- Pro: Shows all real data
+- Con: Slower cold starts on Vercel
+
+**Option B: Sample the Data** (For Faster Performance)
+Create a sampled version:
+```python
+import pandas as pd
+df = pd.read_csv('20251211_LPE_CC_Data_Export.csv')
+sampled = df.iloc[::10]  # Every 10th row
+sampled.to_csv('data_sampled.csv', index=False)
+```
+Then update `api/index.py` to use `data_sampled.csv`
+
+**Option C: External Hosting**
+1. Upload CSV to GitHub Releases or S3
+2. Fetch data dynamically in the app
+3. Add caching for better performance
 
 ### Environment Variables
 No environment variables are required for basic deployment.
