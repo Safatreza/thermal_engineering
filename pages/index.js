@@ -49,14 +49,22 @@ export default function Home() {
       originalPoints: allData.length
     });
 
-    // Temperature traces
+    // Temperature traces with proper labels
     const tempColors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8', '#F7DC6F'];
+    const tempLabels = [
+      'Top Plate',
+      'Solar Panel',
+      'Body (under MLI)',
+      'Radiator Inside',
+      'TVAC Bottom',
+      'Outer Layer TVAC'
+    ];
     const tempTraces = temps.map((temp, i) => ({
       x: sampled.map(row => row.Date),
       y: sampled.map(row => row[temp]),
       type: 'scatter',
       mode: 'lines',
-      name: temp,
+      name: tempLabels[i],
       line: { color: tempColors[i], width: 2 }
     }));
 
@@ -188,8 +196,11 @@ export default function Home() {
         {/* TEMPERATURE CHART */}
         <div style={chartContainerStyle}>
           <h2 style={chartTitleStyle}>
-            🌡️ Temperature Sensors (Temp1-6)
+            🌡️ Temperature Sensors
           </h2>
+          <p style={{ color: '#666', marginBottom: '15px', fontSize: '14px' }}>
+            Top Plate • Solar Panel • Body (MLI) • Radiator Inside • TVAC Bottom • Outer Layer TVAC
+          </p>
           {tempData && (
             <Plot
               data={tempData}
