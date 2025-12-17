@@ -1,12 +1,22 @@
-# Deployment Guide for Vercel
+# Deployment Guide for Vercel - Next.js
 
-This guide will help you deploy the Thermal Engineering Data Visualization app to Vercel.
+This guide will help you deploy the Thermal Engineering Data Visualization Next.js app to Vercel.
 
 ## Prerequisites
 
 1. A Vercel account (sign up at https://vercel.com)
 2. Git installed on your machine
 3. The repository pushed to GitHub
+
+## Why Next.js?
+
+We migrated from Flask to Next.js for better Vercel compatibility:
+- ✅ Native Vercel support (built by the same team)
+- ✅ No serverless function issues
+- ✅ Faster cold starts
+- ✅ Better performance and caching
+- ✅ Automatic optimizations
+- ✅ Client-side CSV processing
 
 ## Deployment Steps
 
@@ -15,10 +25,16 @@ This guide will help you deploy the Thermal Engineering Data Visualization app t
 1. Go to https://vercel.com and log in
 2. Click "Add New Project"
 3. Import your GitHub repository: `Safatreza/thermal_engineering`
-4. Vercel will auto-detect the framework settings
+4. Vercel will auto-detect Next.js configuration
 5. Click "Deploy"
 6. Wait for the deployment to complete (usually 1-2 minutes)
-7. Your app will be live at: `https://thermal-engineering.vercel.app` (or similar)
+7. Your app will be live!
+
+**That's it!** Vercel automatically:
+- Detects Next.js framework
+- Installs dependencies (`npm install`)
+- Builds the project (`npm run build`)
+- Deploys to their global CDN
 
 ### Option 2: Deploy via Vercel CLI
 
@@ -42,15 +58,7 @@ vercel login
 vercel
 ```
 
-5. Follow the prompts:
-   - Set up and deploy? **Y**
-   - Which scope? Select your account
-   - Link to existing project? **N**
-   - Project name? **thermal_engineering**
-   - Directory? **./
-   - Override settings? **N**
-
-6. For production deployment:
+5. For production deployment:
 ```bash
 vercel --prod
 ```
@@ -58,40 +66,23 @@ vercel --prod
 ## Configuration Details
 
 The project includes:
-- `vercel.json` - Vercel configuration file
-- `requirements.txt` - Python dependencies
-- `app.py` - Flask application with Vercel handler
+- `vercel.json` - Minimal Vercel configuration
+- `package.json` - Node dependencies and scripts
+- `next.config.js` - Next.js configuration
 
 ## Important Notes
 
-### Data File Size
-The CSV file (20251211_LPE_CC_Data_Export.csv) is ~32,000 rows (~2MB). Vercel has deployment limits:
-- **Free tier**: 100MB max deployment size
-- **Serverless function**: 50MB max (including dependencies)
+### Data File
+The CSV file is ~2MB and located in `public/` directory:
+- ✅ Automatically served by Next.js
+- ✅ Accessible at `/20251211_LPE_CC_Data_Export.csv`
+- ✅ Parsed client-side with PapaParse
+- ✅ No server processing needed
 
-**Important Note**: The large dataset may cause cold start delays (5-10 seconds) on first load. Consider:
-
-**Option A: Keep Full Dataset** (Current Setup)
-- Pro: Shows all real data
-- Con: Slower cold starts on Vercel
-
-**Option B: Sample the Data** (For Faster Performance)
-Create a sampled version:
-```python
-import pandas as pd
-df = pd.read_csv('20251211_LPE_CC_Data_Export.csv')
-sampled = df.iloc[::10]  # Every 10th row
-sampled.to_csv('data_sampled.csv', index=False)
-```
-Then update `api/index.py` to use `data_sampled.csv`
-
-**Option C: External Hosting**
-1. Upload CSV to GitHub Releases or S3
-2. Fetch data dynamically in the app
-3. Add caching for better performance
-
-### Environment Variables
-No environment variables are required for basic deployment.
+### Performance
+- **First load**: ~2-3 seconds
+- **Subsequent loads**: Near instant (browser caching)
+- **Build time**: ~30-60 seconds on Vercel
 
 ### Custom Domain
 To add a custom domain:
@@ -99,31 +90,20 @@ To add a custom domain:
 2. Settings → Domains
 3. Add your domain and follow DNS instructions
 
-## Troubleshooting
+## Local Development
 
-### Build Fails
-- Check that all dependencies in `requirements.txt` are compatible
-- Ensure the CSV file is in the root directory
-- Check Vercel build logs for specific errors
+Run locally before deploying:
 
-### Function Timeout
-- Vercel free tier has 10s timeout
-- Consider caching the processed data
-- Optimize data loading
+```bash
+npm install
+npm run dev
+```
 
-### Memory Issues
-- Reduce data size or sample the CSV
-- Optimize pandas operations
-- Consider upgrading to Pro plan (3008MB memory vs 1024MB)
-
-## Performance Optimization Tips
-
-1. **Data Caching**: Cache the processed DataFrame
-2. **Downsampling**: For very large datasets, consider displaying every Nth point
-3. **Static Generation**: Pre-render charts as static images for faster load
+Open http://localhost:3000
 
 ## Support
 
 For issues, check:
-- Vercel documentation: https://vercel.com/docs
+- Vercel docs: https://vercel.com/docs
+- Next.js docs: https://nextjs.org/docs
 - Project issues: https://github.com/Safatreza/thermal_engineering/issues
