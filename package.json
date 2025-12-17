@@ -1,0 +1,33 @@
+{
+  "name": "thermal_engineering",
+  "version": "1.0.0",
+  "description": "A Flask web application for visualizing thermal engineering data with interactive charts.",
+  "main": "index.js",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Safatreza/thermal_engineering.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Safatreza/thermal_engineering/issues"
+  },
+  "homepage": "https://github.com/Safatreza/thermal_engineering#readme",
+  "dependencies": {
+    "next": "^16.0.10",
+    "papaparse": "^5.5.3",
+    "plotly.js-dist-min": "^3.3.1",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3",
+    "react-plotly.js": "^2.6.0",
+    "recharts": "^3.6.0"
+  }
+}

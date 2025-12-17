@@ -10,7 +10,11 @@
       "Bash(git push:*)",
       "Bash(python verify_data.py:*)",
       "Bash(curl:*)",
-      "Bash(git commit -m \"$(cat <<''EOF''\nEnhance data visualization and add Vercel deployment support\n\n- Fix data display: Added proper y-axis ranges for temperature charts\n- Use logarithmic scale for pressure visualization (0-993 mbar range)\n- Add statistics cards showing data ranges and averages\n- Temperature range: -18.51°C to 111.29°C across 6 sensors\n- Improve chart sizing and titles\n- Add Vercel deployment configuration (vercel.json)\n- Create comprehensive deployment guide (DEPLOY.md)\n- Add data verification script\n- Update README with deployment instructions and data overview\n- Make project production-ready for Vercel hosting\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>\nEOF\n)\")"
+      "Bash(git commit -m \"$(cat <<''EOF''\nEnhance data visualization and add Vercel deployment support\n\n- Fix data display: Added proper y-axis ranges for temperature charts\n- Use logarithmic scale for pressure visualization (0-993 mbar range)\n- Add statistics cards showing data ranges and averages\n- Temperature range: -18.51°C to 111.29°C across 6 sensors\n- Improve chart sizing and titles\n- Add Vercel deployment configuration (vercel.json)\n- Create comprehensive deployment guide (DEPLOY.md)\n- Add data verification script\n- Update README with deployment instructions and data overview\n- Make project production-ready for Vercel hosting\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>\nEOF\n)\")",
+      "Bash(git commit:*)",
+      "Bash(npm init:*)",
+      "Bash(npm install:*)",
+      "Bash(npm run dev:*)"
     ]
   }
 }
