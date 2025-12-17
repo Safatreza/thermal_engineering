@@ -10,7 +10,7 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    Papa.parse('/data_compressed.csv', {
+    Papa.parse('/data_moderate.csv', {
       download: true,
       header: true,
       dynamicTyping: true,
@@ -154,7 +154,7 @@ export default function Home() {
           padding: '20px',
           opacity: 0.9
         }}>
-          <p>Thermal Engineering Data - Sampled Dataset (649 points from 32,448 original)</p>
+          <p>Thermal Engineering Data - 3,245 data points (90% compression, ~1.7 min intervals)</p>
         </footer>
       </div>
     </div>
