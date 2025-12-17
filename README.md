@@ -1,6 +1,6 @@
 # Thermal Engineering Data Visualization
 
-A Flask web application for visualizing thermal engineering data with interactive charts.
+A Next.js web application for visualizing thermal engineering data with interactive charts.
 
 ## Features
 
@@ -20,34 +20,34 @@ cd thermal_engineering
 
 2. Install required dependencies:
 ```bash
-pip install -r requirements.txt
+npm install
 ```
 
 ## Project Structure
 
 ```
 thermal_engineering/
-├── app.py                    # Local development server
-├── api/
-│   └── index.py             # Vercel serverless function
-├── templates/
-│   └── index.html           # HTML template
-├── 20251211_LPE_CC_Data_Export.csv
-├── requirements.txt
+├── app/
+│   ├── page.js              # Main page component
+│   └── layout.js            # Root layout
+├── public/
+│   └── 20251211_LPE_CC_Data_Export.csv  # Data file
+├── package.json             # Node dependencies
+├── next.config.js           # Next.js configuration
 ├── vercel.json              # Vercel configuration
 └── README.md
 ```
 
 ## Usage
 
-1. Run the Flask application:
+1. Run the Next.js development server:
 ```bash
-python app.py
+npm run dev
 ```
 
 2. Open your web browser and navigate to:
 ```
-http://127.0.0.1:5000
+http://localhost:3000
 ```
 
 ## Data Format
@@ -60,10 +60,11 @@ The application reads CSV data with the following columns:
 
 ## Technologies Used
 
-- **Flask 3.0.0**: Web framework
-- **Pandas 2.1.4**: Data processing
-- **Plotly 5.18.0**: Interactive visualizations
-- **HTML/CSS**: Frontend interface
+- **Next.js 16**: React framework with App Router
+- **React 19**: UI library
+- **Plotly.js**: Interactive visualizations
+- **PapaParse**: CSV parsing
+- **Vercel**: Hosting platform
 
 ## Screenshots
 
