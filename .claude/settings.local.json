@@ -3,7 +3,13 @@
     "allow": [
       "Bash(python app.py:*)",
       "Bash(git init:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$(cat <<''EOF''\nInitial commit: Add thermal engineering data visualization application\n\n- Flask web application with interactive charts\n- Temperature sensors (Temp1-6) visualization\n- Pressure monitoring over time\n- Plotly-based interactive graphs\n- Process 32,000+ data points\n- Responsive UI with modern design\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>\nEOF\n)\")",
+      "Bash(git remote add:*)",
+      "Bash(git branch:*)",
+      "Bash(git push:*)",
+      "Bash(python verify_data.py:*)",
+      "Bash(curl:*)"
     ]
   }
 }

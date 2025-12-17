@@ -45,6 +45,31 @@
             opacity: 0.9;
         }
 
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .stat-card {
+            background: rgba(255, 255, 255, 0.15);
+            padding: 15px;
+            border-radius: 10px;
+            backdrop-filter: blur(10px);
+        }
+
+        .stat-card h3 {
+            font-size: 0.9em;
+            margin-bottom: 5px;
+            opacity: 0.8;
+        }
+
+        .stat-card p {
+            font-size: 1.3em;
+            font-weight: bold;
+        }
+
         .chart-container {
             background: white;
             border-radius: 15px;
@@ -89,7 +114,25 @@
         <header>
             <h1>Thermal Engineering Data Visualization</h1>
             <div class="stats">
-                Total Records: {{ total_records }} data points
+                Total Records: {{ total_records }} data points | {{ date_range }}
+            </div>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <h3>Temperature Range</h3>
+                    <p>{{ temp_stats.min }}°C to {{ temp_stats.max }}°C</p>
+                </div>
+                <div class="stat-card">
+                    <h3>Avg Temperature</h3>
+                    <p>{{ temp_stats.mean }}°C</p>
+                </div>
+                <div class="stat-card">
+                    <h3>Pressure Range</h3>
+                    <p>{{ pressure_stats.min }} to {{ pressure_stats.max }} mbar</p>
+                </div>
+                <div class="stat-card">
+                    <h3>Avg Pressure</h3>
+                    <p>{{ pressure_stats.mean }} mbar</p>
+                </div>
             </div>
         </header>
 

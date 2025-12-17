@@ -58,6 +58,31 @@ Interactive line chart showing all 6 temperature sensors over time.
 ### Pressure Chart
 Area chart displaying pressure variations with filled gradient.
 
+## Deployment
+
+### Deploy to Vercel
+
+This project is configured for easy deployment to Vercel:
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/Safatreza/thermal_engineering)
+
+For detailed deployment instructions, see [DEPLOY.md](DEPLOY.md)
+
+### Quick Deploy Steps
+
+1. Fork or clone this repository
+2. Push to your GitHub account
+3. Connect to Vercel
+4. Deploy with one click
+
+## Data Overview
+
+The visualization processes real thermal engineering data with:
+- **Temperature Range**: -18.51°C to 111.29°C across 6 sensors
+- **Pressure Range**: 0 to 993 mbar (logarithmic scale)
+- **Time Period**: December 11-15, 2025
+- **Data Points**: 32,448 measurements
+
 ## License
 
 This project is open source and available for educational and research purposes.
