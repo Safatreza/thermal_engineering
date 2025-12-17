@@ -16,7 +16,6 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "type": "commonjs",
   "bugs": {
     "url": "https://github.com/Safatreza/thermal_engineering/issues"
   },
@@ -25,8 +24,8 @@
     "next": "^16.0.10",
     "papaparse": "^5.5.3",
     "plotly.js-dist-min": "^3.3.1",
-    "react": "^19.2.3",
-    "react-dom": "^19.2.3",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
     "react-plotly.js": "^2.6.0",
     "recharts": "^3.6.0"
   }
