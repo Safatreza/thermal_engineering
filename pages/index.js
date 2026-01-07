@@ -163,9 +163,12 @@ export default function Home() {
           backdropFilter: 'blur(10px)'
         }}>
           <h1 style={{ fontSize: '2.5em', marginBottom: '10px' }}>
-            Thermal Engineering Data Analysis
+            🛰️ CubeSat Thermal Desktop Analysis
           </h1>
-          <p style={{ fontSize: '1.2em' }}>Ideal Test vs Your Test Comparison</p>
+          <p style={{ fontSize: '1.2em' }}>TVAC Test vs Thermal Desktop Simulation Validation</p>
+          <p style={{ fontSize: '0.9em', marginTop: '10px', opacity: 0.8 }}>
+            Thermal Vacuum Chamber Testing • MLI Analysis • Space Environment Simulation
+          </p>
 
           {/* Toggle Comparison View */}
           <div style={{ marginTop: '20px' }}>
@@ -178,7 +181,7 @@ export default function Home() {
                 background: showComparison ? 'rgba(255, 100, 100, 0.3)' : 'rgba(100, 255, 100, 0.3)'
               }}
             >
-              {showComparison ? '← Back to Ideal Test' : 'View Test Comparisons →'}
+              {showComparison ? '← Back to TVAC Test Data' : 'View Thermal Desktop Comparisons →'}
             </button>
           </div>
 
@@ -252,7 +255,7 @@ export default function Home() {
             {/* IDEAL TEST - TEMPERATURE CHART */}
             <div style={chartContainerStyle}>
               <h2 style={chartTitleStyle}>
-                🌡️ Ideal Test - Temperature Sensors
+                🌡️ TVAC Test - CubeSat Temperature Sensors
               </h2>
               <p style={{ color: '#666', marginBottom: '15px', fontSize: '14px' }}>
                 Top Plate • Solar Panel • Body (MLI) • Radiator Inside • TVAC Bottom • Outer Layer TVAC
@@ -278,7 +281,7 @@ export default function Home() {
             {/* IDEAL TEST - PRESSURE CHART */}
             <div style={chartContainerStyle}>
               <h2 style={chartTitleStyle}>
-                📊 Ideal Test - Pressure Over Time
+                📊 TVAC Chamber - Pressure Over Time
               </h2>
               {pressureData && (
                 <Plot
@@ -317,7 +320,7 @@ export default function Home() {
           borderRadius: '10px',
           marginTop: '20px'
         }}>
-          <p>Thermal Engineering Data - Ideal Test (32K points) vs Your Test Data (100-130 points each)</p>
+          <p>🛰️ CubeSat Thermal Desktop Analysis • TVAC Test (32K points) vs Thermal Desktop Simulation (100-130 points)</p>
         </footer>
       </div>
     </div>
@@ -416,7 +419,7 @@ function ComparisonChart({ title, yourTestName, yourTestData, idealData, idealSe
       y: yourData.map(d => d.value),
       type: 'scatter',
       mode: 'lines+markers',
-      name: `Your Test - ${yourTestName}`,
+      name: `Thermal Desktop - ${yourTestName}`,
       line: { color: color, width: 3 },
       marker: { size: 6 }
     },
@@ -425,7 +428,7 @@ function ComparisonChart({ title, yourTestName, yourTestData, idealData, idealSe
       y: sampled.map(row => row[idealSensor]),
       type: 'scatter',
       mode: 'lines',
-      name: `Ideal Test - ${idealLabel}`,
+      name: `TVAC Test - ${idealLabel}`,
       line: { color: '#888', width: 2, dash: 'dash' },
       opacity: 0.7
     }
@@ -438,12 +441,12 @@ function ComparisonChart({ title, yourTestName, yourTestData, idealData, idealSe
       {/* Statistics Comparison */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '15px', marginBottom: '20px' }}>
         <div style={{ ...statCardStyle, background: 'rgba(100, 200, 255, 0.1)' }}>
-          <h4 style={{ color: color }}>Your Test Mean</h4>
+          <h4 style={{ color: color }}>Thermal Desktop</h4>
           <p style={{ fontSize: '24px', fontWeight: 'bold' }}>{yourStats.mean}{isPressure ? ' mbar' : '°C'}</p>
           <p style={{ fontSize: '12px', color: '#666' }}>Range: {yourStats.range}</p>
         </div>
         <div style={{ ...statCardStyle, background: 'rgba(150, 150, 150, 0.1)' }}>
-          <h4 style={{ color: '#888' }}>Ideal Test Mean</h4>
+          <h4 style={{ color: '#888' }}>TVAC Test</h4>
           <p style={{ fontSize: '24px', fontWeight: 'bold' }}>{idealStats.mean}{isPressure ? ' mbar' : '°C'}</p>
           <p style={{ fontSize: '12px', color: '#666' }}>Range: {idealStats.range}</p>
         </div>
@@ -454,8 +457,8 @@ function ComparisonChart({ title, yourTestName, yourTestData, idealData, idealSe
         </div>
         <div style={statCardStyle}>
           <h4>Data Points</h4>
-          <p style={{ fontSize: '16px' }}>Your: {yourData.length}</p>
-          <p style={{ fontSize: '16px' }}>Ideal: {sampled.length}</p>
+          <p style={{ fontSize: '16px' }}>Simulation: {yourData.length}</p>
+          <p style={{ fontSize: '16px' }}>TVAC: {sampled.length}</p>
         </div>
       </div>
 
@@ -477,11 +480,12 @@ function ComparisonChart({ title, yourTestName, yourTestData, idealData, idealSe
 
       {/* Analysis Text */}
       <div style={{ marginTop: '15px', padding: '15px', background: 'rgba(255,255,255,0.1)', borderRadius: '8px' }}>
-        <h4 style={{ marginBottom: '10px' }}>📈 Analysis:</h4>
+        <h4 style={{ marginBottom: '10px' }}>📈 Thermal Model Validation:</h4>
         <ul style={{ lineHeight: '1.8', paddingLeft: '20px' }}>
-          <li>Your test shows a mean of <strong>{yourStats.mean}{isPressure ? ' mbar' : '°C'}</strong> vs ideal's <strong>{idealStats.mean}{isPressure ? ' mbar' : '°C'}</strong></li>
-          <li>Deviation of <strong>{deviationPercent}%</strong> {deviationPercent < 5 ? '✓ Excellent agreement' : deviationPercent < 10 ? '⚠ Acceptable deviation' : '⚠ Significant deviation - review test conditions'}</li>
-          <li>Your data range ({yourStats.range}) vs Ideal range ({idealStats.range})</li>
+          <li>Thermal Desktop simulation: <strong>{yourStats.mean}{isPressure ? ' mbar' : '°C'}</strong> | TVAC test: <strong>{idealStats.mean}{isPressure ? ' mbar' : '°C'}</strong></li>
+          <li>Model deviation: <strong>{deviationPercent}%</strong> {deviationPercent < 5 ? '✓ Excellent - model validated for flight' : deviationPercent < 10 ? '⚠ Acceptable - minor refinement recommended' : '⚠ Significant - review thermal assumptions & material properties'}</li>
+          <li>Simulation range: {yourStats.range} | TVAC range: {idealStats.range}</li>
+          <li>{deviationPercent < 5 ? '✓ Thermal model accurately predicts on-orbit thermal behavior' : deviationPercent < 10 ? '⚠ Model suitable for preliminary mission planning' : '⚠ Model requires calibration before mission use'}</li>
         </ul>
       </div>
     </div>
