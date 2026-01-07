@@ -9,6 +9,7 @@ export default function Home() {
   const [simData, setSimData] = useState({});
   const [loading, setLoading] = useState(true);
   const [dataScope, setDataScope] = useState(10); // Start with 10% for faster initial load
+  const [activeView, setActiveView] = useState('tvac'); // 'tvac' or 'comparison'
   const [activeSection, setActiveSection] = useState('baseplates');
 
   // Load TVAC test data with sampling
@@ -126,6 +127,65 @@ export default function Home() {
     if (deviation < 5) return { symbol: '✓', color: '#10b981', label: 'Valid' };
     if (deviation < 10) return { symbol: '⚠', color: '#f59e0b', label: 'Acceptable' };
     return { symbol: '⚠', color: '#ef4444', label: 'Review' };
+  };
+
+  // Create TVAC-only chart (no comparison)
+  const createTvacChart = (columnName, title, unit = '°C') => {
+    if (!tvacData) return null;
+
+    const sampledTvac = sampleData(tvacData, dataScope);
+    const dates = sampledTvac.map(row => row.Date).filter(d => d != null);
+    const values = sampledTvac.map(row => {
+      const val = row[columnName];
+      return (val != null && !isNaN(val)) ? val : null;
+    }).filter(v => v != null);
+
+    if (dates.length === 0 || values.length === 0) {
+      return (
+        <div style={{ padding: '20px', background: 'rgba(255,255,255,0.9)', borderRadius: '10px', marginBottom: '20px' }}>
+          <p style={{ color: '#ef4444' }}>Error: No valid data for {title}</p>
+        </div>
+      );
+    }
+
+    // Calculate statistics
+    const mean = values.reduce((a, b) => a + b, 0) / values.length;
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+
+    return (
+      <div style={{ marginBottom: '40px', background: 'rgba(255,255,255,0.95)', padding: '20px', borderRadius: '10px' }}>
+        <h3 style={{ color: '#1f2937', marginBottom: '10px' }}>{title}</h3>
+        <div style={{ display: 'flex', gap: '20px', marginBottom: '10px', fontSize: '14px' }}>
+          <div><strong>Mean:</strong> {mean.toFixed(2)}{unit}</div>
+          <div><strong>Min:</strong> {min.toFixed(2)}{unit}</div>
+          <div><strong>Max:</strong> {max.toFixed(2)}{unit}</div>
+          <div><strong>Range:</strong> {(max - min).toFixed(2)}{unit}</div>
+        </div>
+        <Plot
+          data={[{
+            x: dates,
+            y: values,
+            type: 'scatter',
+            mode: 'lines',
+            name: title,
+            line: { color: '#3b82f6', width: 2, simplify: true }
+          }]}
+          layout={{
+            autosize: true,
+            height: 350,
+            margin: { t: 10, r: 10, b: 40, l: 50 },
+            xaxis: { title: 'Time', showgrid: false },
+            yaxis: { title: `${title} (${unit})` },
+            plot_bgcolor: '#f9fafb',
+            paper_bgcolor: 'transparent',
+            hovermode: 'closest'
+          }}
+          config={{ responsive: true, displayModeBar: false }}
+          style={{ width: '100%' }}
+        />
+      </div>
+    );
   };
 
   // Create comparison chart
@@ -346,7 +406,30 @@ export default function Home() {
     );
   }
 
-  const renderSection = () => {
+  const renderTvacView = () => {
+    return (
+      <>
+        {/* Temperature Charts */}
+        <div style={{ background: 'rgba(255,255,255,0.95)', padding: '20px', borderRadius: '10px', marginBottom: '20px' }}>
+          <h2 style={{ color: '#1f2937', marginBottom: '20px' }}>Temperature Sensors</h2>
+          {createTvacChart('Temp1', 'Top Plate (Temp1)')}
+          {createTvacChart('Temp2', 'Solar Panel (Temp2)')}
+          {createTvacChart('Temp3', 'Body under MLI (Temp3)')}
+          {createTvacChart('Temp4', 'Radiator Inside (Temp4)')}
+          {createTvacChart('Temp5', 'TVAC Bottom (Temp5)')}
+          {createTvacChart('Temp6', 'Outer Layer TVAC (Temp6)')}
+        </div>
+
+        {/* Pressure Chart */}
+        <div style={{ background: 'rgba(255,255,255,0.95)', padding: '20px', borderRadius: '10px', marginBottom: '20px' }}>
+          <h2 style={{ color: '#1f2937', marginBottom: '20px' }}>Pressure Monitoring</h2>
+          {createTvacChart('Pressure', 'Vacuum Chamber Pressure', 'mbar')}
+        </div>
+      </>
+    );
+  };
+
+  const renderComparisonSection = () => {
     switch(activeSection) {
       case 'baseplates':
         return (
@@ -402,34 +485,70 @@ export default function Home() {
             CubeSat Thermal Desktop Validation
           </h1>
           <p style={{ color: '#6b7280', marginBottom: '20px' }}>
-            Comparing Thermal Desktop simulation results with TVAC test data
+            {activeView === 'tvac' ? 'TVAC Test Data Analysis' : 'Thermal Desktop Simulation Comparison'}
           </p>
 
-          {/* Section Tabs */}
+          {/* View Tabs */}
           <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', flexWrap: 'wrap' }}>
-            {[
-              { key: 'baseplates', label: 'Base Plates (4)' },
-              { key: 'solarpanels', label: 'Solar Panels (4)' },
-              { key: 'components', label: 'Components (2)' },
-              { key: 'pressure', label: 'Pressure (2)' }
-            ].map(({ key, label }) => (
-              <button
-                key={key}
-                onClick={() => setActiveSection(key)}
-                style={{
-                  padding: '10px 20px',
-                  background: activeSection === key ? '#3b82f6' : '#e5e7eb',
-                  color: activeSection === key ? '#fff' : '#1f2937',
-                  border: 'none',
-                  borderRadius: '5px',
-                  cursor: 'pointer',
-                  fontWeight: activeSection === key ? 'bold' : 'normal'
-                }}
-              >
-                {label}
-              </button>
-            ))}
+            <button
+              onClick={() => setActiveView('tvac')}
+              style={{
+                padding: '12px 24px',
+                background: activeView === 'tvac' ? '#2563eb' : '#e5e7eb',
+                color: activeView === 'tvac' ? '#fff' : '#1f2937',
+                border: 'none',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontWeight: 'bold',
+                fontSize: '16px'
+              }}
+            >
+              TVAC Test Data
+            </button>
+            <button
+              onClick={() => setActiveView('comparison')}
+              style={{
+                padding: '12px 24px',
+                background: activeView === 'comparison' ? '#2563eb' : '#e5e7eb',
+                color: activeView === 'comparison' ? '#fff' : '#1f2937',
+                border: 'none',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontWeight: 'bold',
+                fontSize: '16px'
+              }}
+            >
+              Simulation Comparison
+            </button>
           </div>
+
+          {/* Comparison Section Tabs - only show in comparison view */}
+          {activeView === 'comparison' && (
+            <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', flexWrap: 'wrap' }}>
+              {[
+                { key: 'baseplates', label: 'Base Plates (4)' },
+                { key: 'solarpanels', label: 'Solar Panels (4)' },
+                { key: 'components', label: 'Components (2)' },
+                { key: 'pressure', label: 'Pressure (2)' }
+              ].map(({ key, label }) => (
+                <button
+                  key={key}
+                  onClick={() => setActiveSection(key)}
+                  style={{
+                    padding: '10px 20px',
+                    background: activeSection === key ? '#3b82f6' : '#e5e7eb',
+                    color: activeSection === key ? '#fff' : '#1f2937',
+                    border: 'none',
+                    borderRadius: '5px',
+                    cursor: 'pointer',
+                    fontWeight: activeSection === key ? 'bold' : 'normal'
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
 
           {/* Data Scope Control */}
           <div style={{ marginTop: '20px' }}>
@@ -451,8 +570,8 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Active Section */}
-        {renderSection()}
+        {/* Active View */}
+        {activeView === 'tvac' ? renderTvacView() : renderComparisonSection()}
       </div>
     </div>
   );
