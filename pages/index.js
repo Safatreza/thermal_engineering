@@ -12,44 +12,44 @@ export default function Home() {
   const [activeView, setActiveView] = useState('tvac'); // 'tvac' or 'comparison'
   const [activeSection, setActiveSection] = useState('baseplates');
 
-  // Load TVAC test data with sampling
+  // Load FULL RESOLUTION TVAC test data - no sampling for real thermal cycles
   useEffect(() => {
-    console.log('Loading TVAC data...');
-    Papa.parse('/data_moderate.csv', {
+    console.log('Loading FULL RESOLUTION TVAC data...');
+    Papa.parse('/20251211_LPE_CC_Data_Export.csv', {
       download: true,
       header: true,
       dynamicTyping: true,
       skipEmptyLines: true,
       complete: (result) => {
-        console.log('TVAC data loaded:', result.data.length, 'rows');
+        console.log('Full TVAC data loaded:', result.data.length, 'rows (FULL RESOLUTION)');
         if (result.data && result.data.length > 0) {
           setTvacData(result.data);
+          setLoading(false);
         } else {
-          console.error('No data in moderate CSV, trying full CSV');
-          loadFullTvacData();
+          console.error('No data in full CSV, trying moderate');
+          loadModerateTvacData();
         }
       },
       error: (error) => {
-        console.error('Error loading moderate TVAC data:', error);
-        loadFullTvacData();
+        console.error('Error loading full TVAC data:', error);
+        loadModerateTvacData();
       }
     });
 
-    function loadFullTvacData() {
-      Papa.parse('/20251211_LPE_CC_Data_Export.csv', {
+    function loadModerateTvacData() {
+      Papa.parse('/data_moderate.csv', {
         download: true,
         header: true,
         dynamicTyping: true,
         skipEmptyLines: true,
         complete: (result) => {
-          console.log('Full TVAC data loaded:', result.data.length, 'rows');
-          // Sample to 10% immediately for performance
-          const sampled = result.data.filter((_, i) => i % 10 === 0);
-          console.log('Sampled to:', sampled.length, 'rows');
-          setTvacData(sampled);
+          console.log('Fallback: Moderate TVAC data loaded:', result.data.length, 'rows');
+          setTvacData(result.data);
+          setLoading(false);
         },
         error: (err) => {
           console.error('Critical error loading TVAC data:', err);
+          setLoading(false);
         }
       });
     }
@@ -129,13 +129,13 @@ export default function Home() {
     return { symbol: '⚠', color: '#ef4444', label: 'Review' };
   };
 
-  // Create TVAC-only chart (no comparison)
+  // Create TVAC-only chart (no comparison) - FULL RESOLUTION
   const createTvacChart = (columnName, title, unit = '°C') => {
     if (!tvacData) return null;
 
-    const sampledTvac = sampleData(tvacData, dataScope);
-    const dates = sampledTvac.map(row => row.Date).filter(d => d != null);
-    const values = sampledTvac.map(row => {
+    // Use FULL data for TVAC charts - no sampling for real thermal cycles
+    const dates = tvacData.map(row => row.Date).filter(d => d != null);
+    const values = tvacData.map(row => {
       const val = row[columnName];
       return (val != null && !isNaN(val)) ? val : null;
     }).filter(v => v != null);
@@ -161,6 +161,7 @@ export default function Home() {
           <div><strong>Min:</strong> {min.toFixed(2)}{unit}</div>
           <div><strong>Max:</strong> {max.toFixed(2)}{unit}</div>
           <div><strong>Range:</strong> {(max - min).toFixed(2)}{unit}</div>
+          <div style={{ color: '#6b7280' }}><strong>Points:</strong> {values.length.toLocaleString()}</div>
         </div>
         <Plot
           data={[{
@@ -169,19 +170,33 @@ export default function Home() {
             type: 'scatter',
             mode: 'lines',
             name: title,
-            line: { color: '#3b82f6', width: 2, simplify: true }
+            line: {
+              color: '#3b82f6',
+              width: 1.5,
+              shape: 'linear'
+            }
           }]}
           layout={{
             autosize: true,
-            height: 350,
-            margin: { t: 10, r: 10, b: 40, l: 50 },
-            xaxis: { title: 'Time', showgrid: false },
-            yaxis: { title: `${title} (${unit})` },
+            height: 450,
+            margin: { t: 10, r: 10, b: 40, l: 60 },
+            xaxis: {
+              title: 'Time',
+              showgrid: true,
+              gridcolor: '#e5e7eb',
+              gridwidth: 1
+            },
+            yaxis: {
+              title: `${title} (${unit})`,
+              showgrid: true,
+              gridcolor: '#e5e7eb',
+              gridwidth: 1
+            },
             plot_bgcolor: '#f9fafb',
             paper_bgcolor: 'transparent',
-            hovermode: 'closest'
+            hovermode: 'x unified'
           }}
-          config={{ responsive: true, displayModeBar: false }}
+          config={{ responsive: true, displayModeBar: true }}
           style={{ width: '100%' }}
         />
       </div>
