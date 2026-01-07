@@ -1,142 +1,249 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import Papa from 'papaparse';
 
 const Plot = dynamic(() => import('react-plotly.js'), { ssr: false });
 
 export default function Home() {
-  const [idealData, setIdealData] = useState(null);
-  const [yourTestData, setYourTestData] = useState({});
-  const [tempData, setTempData] = useState(null);
-  const [pressureData, setPressureData] = useState(null);
+  const [tvacData, setTvacData] = useState(null);
+  const [simData, setSimData] = useState({});
   const [loading, setLoading] = useState(true);
-  const [samplingRate, setSamplingRate] = useState(10);
-  const [stats, setStats] = useState(null);
-  const [showComparison, setShowComparison] = useState(false);
+  const [dataScope, setDataScope] = useState(100);
 
-  // Load ideal test data
+  // Load TVAC test data
   useEffect(() => {
     Papa.parse('/20251211_LPE_CC_Data_Export.csv', {
       download: true,
       header: true,
       dynamicTyping: true,
-      complete: (results) => {
-        const data = results.data.filter(row => row.Date && row.Temp1);
-        setIdealData(data);
-        loadYourTestData();
+      complete: (result) => {
+        setTvacData(result.data);
       }
     });
   }, []);
 
-  // Load your test files
-  const loadYourTestData = () => {
-    const testFiles = [
-      { file: 'BASEPLATE_1106.csv', name: 'Base Plate', idealSensor: 'Temp1' },
-      { file: 'BODY_1254.csv', name: 'Body', idealSensor: 'Temp3' },
-      { file: 'RADIATOR_1300.csv', name: 'Radiator', idealSensor: 'Temp4' },
-      { file: 'SOLARPANNEL_BOTTOM_LEFT_2309.csv', name: 'Solar Panel', idealSensor: 'Temp2' },
-      { file: 'PRESSURECHAMBER_8000.csv', name: 'Pressure Chamber 8000', idealSensor: 'Pressure' },
-      { file: 'PRESSURECHAMBER_8150.csv', name: 'Pressure Chamber 8150', idealSensor: 'Pressure' }
+  // Load all test_2 simulation variants
+  useEffect(() => {
+    const simFiles = [
+      'BASEPLATE_1105', 'BASEPLATE_1106', 'BASEPLATE_1109', 'BASEPLATE_1110',
+      'SOLARPANNEL_BOTTOM_LEFT_2309', 'SOLARPANNEL_BOTTOM_LEFT_2310',
+      'SOLARPANNEL_BOTTOM_LEFT_2313', 'SOLARPANNEL_BOTTOM_LEFT_2314',
+      'BODY_1254', 'RADIATOR_1300',
+      'PRESSURECHAMBER_8000', 'PRESSURECHAMBER_8150'
     ];
 
-    let loadedCount = 0;
-    const loadedData = {};
-
-    testFiles.forEach(({ file, name, idealSensor }) => {
-      Papa.parse(`/${file}`, {
-        download: true,
-        header: true,
-        dynamicTyping: true,
-        complete: (results) => {
-          loadedData[name] = {
-            data: results.data.filter(row => row.Time != null),
-            idealSensor
-          };
-          loadedCount++;
-          if (loadedCount === testFiles.length) {
-            setYourTestData(loadedData);
-            setLoading(false);
+    const loadPromises = simFiles.map(fileName =>
+      new Promise((resolve) => {
+        Papa.parse(`/test_2/${fileName}.csv`, {
+          download: true,
+          header: true,
+          dynamicTyping: true,
+          complete: (result) => {
+            resolve({ name: fileName, data: result.data });
           }
-        }
+        });
+      })
+    );
+
+    Promise.all(loadPromises).then(results => {
+      const dataObj = {};
+      results.forEach(({ name, data }) => {
+        dataObj[name] = data;
       });
+      setSimData(dataObj);
+      setLoading(false);
     });
+  }, []);
+
+  // Apply data scope sampling
+  const sampleData = (data, percentage) => {
+    if (!data || percentage === 100) return data;
+    const step = Math.floor(100 / percentage);
+    return data.filter((_, index) => index % step === 0);
   };
 
-  // Update charts when ideal data changes
-  useEffect(() => {
-    if (!idealData) return;
+  // Calculate statistics
+  const calculateStats = (simValues, tvacValues) => {
+    const simMean = simValues.reduce((a, b) => a + b, 0) / simValues.length;
+    const tvacMean = tvacValues.reduce((a, b) => a + b, 0) / tvacValues.length;
+    const deviation = Math.abs(((simMean - tvacMean) / tvacMean) * 100);
+    return { simMean, tvacMean, deviation };
+  };
 
-    const sampled = idealData.filter((_, i) => i % samplingRate === 0);
-    const temps = ['Temp1', 'Temp2', 'Temp3', 'Temp4', 'Temp5', 'Temp6'];
+  // Get validation status
+  const getValidationStatus = (deviation) => {
+    if (deviation < 5) return { symbol: '✓', color: '#10b981', label: 'Valid' };
+    if (deviation < 10) return { symbol: '⚠', color: '#f59e0b', label: 'Acceptable' };
+    return { symbol: '⚠', color: '#ef4444', label: 'Review' };
+  };
+
+  // Create comparison chart
+  const createComparisonChart = (simName, simData, tvacTempColumn, title) => {
+    if (!tvacData || !simData) return null;
+
+    const sampledTvac = sampleData(tvacData, dataScope);
+    const sampledSim = sampleData(simData, 100); // Use all simulation data (101 points)
+
+    // Extract TVAC data
+    const tvacDates = sampledTvac.map(row => row.Date);
+    const tvacTemps = sampledTvac.map(row => row[tvacTempColumn]);
+
+    // Extract simulation data - convert Kelvin to Celsius
+    const simTimes = sampledSim.map(row => row.Time);
+    const simTemps = sampledSim.map(row => row['case2.sav'] ? row['case2.sav'] - 273.15 : null);
 
     // Calculate statistics
-    const tempValues = temps.flatMap(t => sampled.map(row => row[t]).filter(v => v != null));
-    const pressureValues = sampled.map(row => row.Pressure).filter(v => v != null);
+    const stats = calculateStats(
+      simTemps.filter(v => v !== null),
+      tvacTemps.filter(v => v !== null && !isNaN(v))
+    );
+    const validation = getValidationStatus(stats.deviation);
 
-    setStats({
-      tempMin: Math.min(...tempValues).toFixed(2),
-      tempMax: Math.max(...tempValues).toFixed(2),
-      tempMean: (tempValues.reduce((a, b) => a + b, 0) / tempValues.length).toFixed(2),
-      pressureMin: Math.min(...pressureValues).toFixed(2),
-      pressureMax: Math.max(...pressureValues).toFixed(2),
-      pressureMean: (pressureValues.reduce((a, b) => a + b, 0) / pressureValues.length).toFixed(2),
-      totalPoints: sampled.length,
-      originalPoints: idealData.length
-    });
+    return (
+      <div key={simName} style={{ marginBottom: '40px', background: 'rgba(255,255,255,0.95)', padding: '20px', borderRadius: '10px' }}>
+        <h3 style={{ color: '#1f2937', marginBottom: '10px' }}>{title}</h3>
+        <div style={{ display: 'flex', gap: '20px', marginBottom: '10px', fontSize: '14px' }}>
+          <div>
+            <strong>Simulation Mean:</strong> {stats.simMean.toFixed(2)}°C
+          </div>
+          <div>
+            <strong>TVAC Mean:</strong> {stats.tvacMean.toFixed(2)}°C
+          </div>
+          <div>
+            <strong>Deviation:</strong> {stats.deviation.toFixed(2)}%
+          </div>
+          <div style={{ color: validation.color, fontWeight: 'bold' }}>
+            {validation.symbol} {validation.label}
+          </div>
+        </div>
+        <Plot
+          data={[
+            {
+              x: tvacDates,
+              y: tvacTemps,
+              type: 'scatter',
+              mode: 'lines',
+              name: 'TVAC Test',
+              line: { color: '#3b82f6', width: 2 }
+            },
+            {
+              x: simTimes,
+              y: simTemps,
+              type: 'scatter',
+              mode: 'lines',
+              name: 'Thermal Desktop Simulation',
+              line: { color: '#ef4444', width: 2, dash: 'dash' }
+            }
+          ]}
+          layout={{
+            autosize: true,
+            height: 400,
+            margin: { t: 20, r: 20, b: 40, l: 50 },
+            xaxis: { title: 'Time' },
+            yaxis: { title: 'Temperature (°C)' },
+            legend: { orientation: 'h', y: -0.15 },
+            plot_bgcolor: '#f9fafb',
+            paper_bgcolor: 'transparent'
+          }}
+          config={{ responsive: true }}
+          style={{ width: '100%' }}
+        />
+      </div>
+    );
+  };
 
-    // Temperature traces
-    const tempColors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8', '#F7DC6F'];
-    const tempLabels = [
-      'Top Plate',
-      'Solar Panel',
-      'Body (under MLI)',
-      'Radiator Inside',
-      'TVAC Bottom',
-      'Outer Layer TVAC'
-    ];
+  // Create pressure comparison chart
+  const createPressureChart = (simName, simData, title) => {
+    if (!tvacData || !simData) return null;
 
-    const tempTraces = temps.map((temp, i) => ({
-      x: sampled.map(row => row.Date),
-      y: sampled.map(row => row[temp]),
-      type: 'scatter',
-      mode: 'lines',
-      name: tempLabels[i],
-      line: { color: tempColors[i], width: 2 }
-    }));
+    const sampledTvac = sampleData(tvacData, dataScope);
+    const sampledSim = sampleData(simData, 100);
 
-    const pressureTrace = [{
-      x: sampled.map(row => row.Date),
-      y: sampled.map(row => row.Pressure),
-      type: 'scatter',
-      mode: 'lines',
-      name: 'Pressure',
-      line: { color: '#E74C3C', width: 2 }
-    }];
+    // Extract TVAC pressure data
+    const tvacDates = sampledTvac.map(row => row.Date);
+    const tvacPressure = sampledTvac.map(row => row.Pressure);
 
-    setTempData(tempTraces);
-    setPressureData(pressureTrace);
-  }, [idealData, samplingRate]);
+    // Extract simulation pressure - convert Kelvin to Celsius (treating as temperature proxy)
+    const simTimes = sampledSim.map(row => row.Time);
+    const simTemps = sampledSim.map(row => row['case2.sav'] ? row['case2.sav'] - 273.15 : null);
+
+    // For pressure chambers, we'll compare temperature profiles
+    const stats = calculateStats(
+      simTemps.filter(v => v !== null),
+      tvacPressure.filter(v => v !== null && !isNaN(v))
+    );
+    const validation = getValidationStatus(stats.deviation);
+
+    return (
+      <div key={simName} style={{ marginBottom: '40px', background: 'rgba(255,255,255,0.95)', padding: '20px', borderRadius: '10px' }}>
+        <h3 style={{ color: '#1f2937', marginBottom: '10px' }}>{title}</h3>
+        <div style={{ display: 'flex', gap: '20px', marginBottom: '10px', fontSize: '14px' }}>
+          <div>
+            <strong>Simulation Mean:</strong> {stats.simMean.toFixed(2)}
+          </div>
+          <div>
+            <strong>TVAC Mean:</strong> {stats.tvacMean.toFixed(2)} mbar
+          </div>
+          <div>
+            <strong>Deviation:</strong> {stats.deviation.toFixed(2)}%
+          </div>
+          <div style={{ color: validation.color, fontWeight: 'bold' }}>
+            {validation.symbol} {validation.label}
+          </div>
+        </div>
+        <Plot
+          data={[
+            {
+              x: tvacDates,
+              y: tvacPressure,
+              type: 'scatter',
+              mode: 'lines',
+              name: 'TVAC Test Pressure',
+              line: { color: '#3b82f6', width: 2 }
+            },
+            {
+              x: simTimes,
+              y: simTemps,
+              type: 'scatter',
+              mode: 'lines',
+              name: 'Simulation Temperature',
+              line: { color: '#ef4444', width: 2, dash: 'dash' },
+              yaxis: 'y2'
+            }
+          ]}
+          layout={{
+            autosize: true,
+            height: 400,
+            margin: { t: 20, r: 50, b: 40, l: 50 },
+            xaxis: { title: 'Time' },
+            yaxis: { title: 'Pressure (mbar)' },
+            yaxis2: {
+              title: 'Temperature (°C)',
+              overlaying: 'y',
+              side: 'right'
+            },
+            legend: { orientation: 'h', y: -0.15 },
+            plot_bgcolor: '#f9fafb',
+            paper_bgcolor: 'transparent'
+          }}
+          config={{ responsive: true }}
+          style={{ width: '100%' }}
+        />
+      </div>
+    );
+  };
 
   if (loading) {
     return (
       <div style={{
+        minHeight: '100vh',
+        background: 'url(/background.jfif) center/cover',
         display: 'flex',
-        justifyContent: 'center',
         alignItems: 'center',
-        height: '100vh',
-        backgroundImage: 'url(/background.jfif)',
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-        color: 'white',
-        fontSize: '24px'
+        justifyContent: 'center'
       }}>
-        <div style={{
-          background: 'rgba(0, 0, 0, 0.7)',
-          padding: '40px',
-          borderRadius: '15px'
-        }}>
-          <h1>Loading test data...</h1>
-          <p style={{ fontSize: '16px', marginTop: '10px' }}>Processing ideal & your test datasets...</p>
+        <div style={{ background: 'rgba(255,255,255,0.95)', padding: '40px', borderRadius: '10px' }}>
+          <h2 style={{ color: '#1f2937' }}>Loading CubeSat Thermal Data...</h2>
         </div>
       </div>
     );
@@ -144,387 +251,68 @@ export default function Home() {
 
   return (
     <div style={{
-      backgroundImage: 'url(/background.jfif)',
-      backgroundSize: 'cover',
-      backgroundPosition: 'center',
-      backgroundAttachment: 'fixed',
       minHeight: '100vh',
+      background: 'url(/background.jfif) center/cover fixed',
       padding: '20px'
     }}>
       <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
-
-        <header style={{
-          textAlign: 'center',
-          color: 'white',
-          marginBottom: '30px',
-          padding: '30px',
-          background: 'rgba(0, 0, 0, 0.6)',
-          borderRadius: '15px',
-          backdropFilter: 'blur(10px)'
-        }}>
-          <h1 style={{ fontSize: '2.5em', marginBottom: '10px' }}>
-            🛰️ CubeSat Thermal Desktop Analysis
+        {/* Header */}
+        <div style={{ background: 'rgba(255,255,255,0.95)', padding: '30px', borderRadius: '10px', marginBottom: '20px' }}>
+          <h1 style={{ color: '#1f2937', marginBottom: '10px' }}>
+            CubeSat Thermal Desktop Validation
           </h1>
-          <p style={{ fontSize: '1.2em' }}>TVAC Test vs Thermal Desktop Simulation Validation</p>
-          <p style={{ fontSize: '0.9em', marginTop: '10px', opacity: 0.8 }}>
-            Thermal Vacuum Chamber Testing • MLI Analysis • Space Environment Simulation
+          <p style={{ color: '#6b7280', marginBottom: '20px' }}>
+            Comparing Thermal Desktop simulation results with TVAC test data
           </p>
 
-          {/* Toggle Comparison View */}
+          {/* Data Scope Control */}
           <div style={{ marginTop: '20px' }}>
-            <button
-              onClick={() => setShowComparison(!showComparison)}
-              style={{
-                ...buttonStyle,
-                padding: '15px 30px',
-                fontSize: '16px',
-                background: showComparison ? 'rgba(255, 100, 100, 0.3)' : 'rgba(100, 255, 100, 0.3)'
-              }}
-            >
-              {showComparison ? '← Back to TVAC Test Data' : 'View Thermal Desktop Comparisons →'}
-            </button>
+            <label style={{ color: '#1f2937', marginRight: '10px' }}>
+              TVAC Data Scope: {dataScope}%
+            </label>
+            <input
+              type="range"
+              min="1"
+              max="100"
+              value={dataScope}
+              onChange={(e) => setDataScope(parseInt(e.target.value))}
+              style={{ width: '300px' }}
+            />
           </div>
+        </div>
 
-          {!showComparison && (
-            <>
-              {/* Data Scope Control */}
-              <div style={{
-                marginTop: '20px',
-                padding: '20px',
-                background: 'rgba(255, 255, 255, 0.1)',
-                borderRadius: '10px'
-              }}>
-                <h3 style={{ marginBottom: '15px', fontSize: '1.2em' }}>Data Scope Control</h3>
-                <div style={{ marginBottom: '10px' }}>
-                  <label style={{ fontSize: '1em', marginRight: '10px' }}>
-                    Sampling Rate: Every {samplingRate} point{samplingRate > 1 ? 's' : ''}
-                  </label>
-                </div>
-                <input
-                  type="range"
-                  min="1"
-                  max="100"
-                  value={samplingRate}
-                  onChange={(e) => setSamplingRate(parseInt(e.target.value))}
-                  style={{
-                    width: '100%',
-                    maxWidth: '500px',
-                    cursor: 'pointer'
-                  }}
-                />
-                <div style={{ marginTop: '10px', display: 'flex', justifyContent: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                  <button onClick={() => setSamplingRate(1)} style={buttonStyle}>All Data (32K)</button>
-                  <button onClick={() => setSamplingRate(5)} style={buttonStyle}>High (6.5K)</button>
-                  <button onClick={() => setSamplingRate(10)} style={buttonStyle}>Medium (3.2K)</button>
-                  <button onClick={() => setSamplingRate(50)} style={buttonStyle}>Low (650)</button>
-                </div>
-              </div>
+        {/* Base Plates Section */}
+        <div style={{ background: 'rgba(255,255,255,0.95)', padding: '20px', borderRadius: '10px', marginBottom: '20px' }}>
+          <h2 style={{ color: '#1f2937', marginBottom: '20px' }}>Base Plate Variants</h2>
+          {createComparisonChart('BASEPLATE_1105', simData.BASEPLATE_1105, 'Temp1', 'Base Plate 1105 vs TVAC Top Plate')}
+          {createComparisonChart('BASEPLATE_1106', simData.BASEPLATE_1106, 'Temp1', 'Base Plate 1106 vs TVAC Top Plate')}
+          {createComparisonChart('BASEPLATE_1109', simData.BASEPLATE_1109, 'Temp1', 'Base Plate 1109 vs TVAC Top Plate')}
+          {createComparisonChart('BASEPLATE_1110', simData.BASEPLATE_1110, 'Temp1', 'Base Plate 1110 vs TVAC Top Plate')}
+        </div>
 
-              {/* Statistics */}
-              {stats && (
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
-                  gap: '15px',
-                  marginTop: '20px'
-                }}>
-                  <div style={statCardStyle}>
-                    <h4>Showing</h4>
-                    <p>{stats.totalPoints.toLocaleString()} / {stats.originalPoints.toLocaleString()}</p>
-                  </div>
-                  <div style={statCardStyle}>
-                    <h4>Temp Range</h4>
-                    <p>{stats.tempMin}°C - {stats.tempMax}°C</p>
-                  </div>
-                  <div style={statCardStyle}>
-                    <h4>Avg Temp</h4>
-                    <p>{stats.tempMean}°C</p>
-                  </div>
-                  <div style={statCardStyle}>
-                    <h4>Pressure Range</h4>
-                    <p>{stats.pressureMin} - {stats.pressureMax} mbar</p>
-                  </div>
-                </div>
-              )}
-            </>
-          )}
-        </header>
+        {/* Solar Panels Section */}
+        <div style={{ background: 'rgba(255,255,255,0.95)', padding: '20px', borderRadius: '10px', marginBottom: '20px' }}>
+          <h2 style={{ color: '#1f2937', marginBottom: '20px' }}>Solar Panel Variants</h2>
+          {createComparisonChart('SOLARPANNEL_2309', simData.SOLARPANNEL_BOTTOM_LEFT_2309, 'Temp2', 'Solar Panel 2309 vs TVAC Solar Panel')}
+          {createComparisonChart('SOLARPANNEL_2310', simData.SOLARPANNEL_BOTTOM_LEFT_2310, 'Temp2', 'Solar Panel 2310 vs TVAC Solar Panel')}
+          {createComparisonChart('SOLARPANNEL_2313', simData.SOLARPANNEL_BOTTOM_LEFT_2313, 'Temp2', 'Solar Panel 2313 vs TVAC Solar Panel')}
+          {createComparisonChart('SOLARPANNEL_2314', simData.SOLARPANNEL_BOTTOM_LEFT_2314, 'Temp2', 'Solar Panel 2314 vs TVAC Solar Panel')}
+        </div>
 
-        {!showComparison ? (
-          <>
-            {/* IDEAL TEST - TEMPERATURE CHART */}
-            <div style={chartContainerStyle}>
-              <h2 style={chartTitleStyle}>
-                🌡️ TVAC Test - CubeSat Temperature Sensors
-              </h2>
-              <p style={{ color: '#666', marginBottom: '15px', fontSize: '14px' }}>
-                Top Plate • Solar Panel • Body (MLI) • Radiator Inside • TVAC Bottom • Outer Layer TVAC
-              </p>
-              {tempData && (
-                <Plot
-                  data={tempData}
-                  layout={{
-                    xaxis: { title: 'Date/Time' },
-                    yaxis: { title: 'Temperature (°C)' },
-                    hovermode: 'closest',
-                    height: 600,
-                    margin: { l: 60, r: 40, t: 20, b: 60 },
-                    paper_bgcolor: 'rgba(255,255,255,0.95)',
-                    plot_bgcolor: 'rgba(255,255,255,0.95)'
-                  }}
-                  config={{ responsive: true }}
-                  style={{ width: '100%' }}
-                />
-              )}
-            </div>
+        {/* Other Components Section */}
+        <div style={{ background: 'rgba(255,255,255,0.95)', padding: '20px', borderRadius: '10px', marginBottom: '20px' }}>
+          <h2 style={{ color: '#1f2937', marginBottom: '20px' }}>Other Components</h2>
+          {createComparisonChart('BODY_1254', simData.BODY_1254, 'Temp3', 'Body 1254 vs TVAC Body (under MLI)')}
+          {createComparisonChart('RADIATOR_1300', simData.RADIATOR_1300, 'Temp4', 'Radiator 1300 vs TVAC Radiator Inside')}
+        </div>
 
-            {/* IDEAL TEST - PRESSURE CHART */}
-            <div style={chartContainerStyle}>
-              <h2 style={chartTitleStyle}>
-                📊 TVAC Chamber - Pressure Over Time
-              </h2>
-              {pressureData && (
-                <Plot
-                  data={pressureData}
-                  layout={{
-                    xaxis: { title: 'Date/Time' },
-                    yaxis: {
-                      title: 'Pressure (mbar)',
-                      type: 'log'
-                    },
-                    hovermode: 'closest',
-                    height: 600,
-                    margin: { l: 60, r: 40, t: 20, b: 60 },
-                    paper_bgcolor: 'rgba(255,255,255,0.95)',
-                    plot_bgcolor: 'rgba(255,255,255,0.95)'
-                  }}
-                  config={{ responsive: true }}
-                  style={{ width: '100%' }}
-                />
-              )}
-            </div>
-          </>
-        ) : (
-          <ComparisonView
-            idealData={idealData}
-            yourTestData={yourTestData}
-            samplingRate={samplingRate}
-          />
-        )}
-
-        <footer style={{
-          textAlign: 'center',
-          color: 'white',
-          padding: '20px',
-          background: 'rgba(0, 0, 0, 0.6)',
-          borderRadius: '10px',
-          marginTop: '20px'
-        }}>
-          <p>🛰️ CubeSat Thermal Desktop Analysis • TVAC Test (32K points) vs Thermal Desktop Simulation (100-130 points)</p>
-        </footer>
+        {/* Pressure Chamber Section */}
+        <div style={{ background: 'rgba(255,255,255,0.95)', padding: '20px', borderRadius: '10px', marginBottom: '20px' }}>
+          <h2 style={{ color: '#1f2937', marginBottom: '20px' }}>Pressure Chamber Variants</h2>
+          {createPressureChart('PRESSURECHAMBER_8000', simData.PRESSURECHAMBER_8000, 'Pressure Chamber 8000 vs TVAC Pressure')}
+          {createPressureChart('PRESSURECHAMBER_8150', simData.PRESSURECHAMBER_8150, 'Pressure Chamber 8150 vs TVAC Pressure')}
+        </div>
       </div>
     </div>
   );
 }
-
-// Comparison View Component
-function ComparisonView({ idealData, yourTestData, samplingRate }) {
-  const comparisons = [
-    { yourTest: 'Base Plate', idealSensor: 'Temp1', idealLabel: 'Top Plate', color: '#FF6B6B' },
-    { yourTest: 'Solar Panel', idealSensor: 'Temp2', idealLabel: 'Solar Panel', color: '#4ECDC4' },
-    { yourTest: 'Body', idealSensor: 'Temp3', idealLabel: 'Body (under MLI)', color: '#45B7D1' },
-    { yourTest: 'Radiator', idealSensor: 'Temp4', idealLabel: 'Radiator Inside', color: '#FFA07A' },
-  ];
-
-  return (
-    <div>
-      {comparisons.map((comp, idx) => (
-        <ComparisonChart
-          key={idx}
-          title={`${comp.yourTest} Comparison`}
-          yourTestName={comp.yourTest}
-          yourTestData={yourTestData[comp.yourTest]}
-          idealData={idealData}
-          idealSensor={comp.idealSensor}
-          idealLabel={comp.idealLabel}
-          color={comp.color}
-          samplingRate={samplingRate}
-        />
-      ))}
-
-      {/* Pressure Comparisons */}
-      <ComparisonChart
-        title="Pressure Chamber 8000 vs Ideal Pressure"
-        yourTestName="Pressure Chamber 8000"
-        yourTestData={yourTestData['Pressure Chamber 8000']}
-        idealData={idealData}
-        idealSensor="Pressure"
-        idealLabel="Ideal Pressure"
-        color="#E74C3C"
-        samplingRate={samplingRate}
-        isPressure={true}
-      />
-
-      <ComparisonChart
-        title="Pressure Chamber 8150 vs Ideal Pressure"
-        yourTestName="Pressure Chamber 8150"
-        yourTestData={yourTestData['Pressure Chamber 8150']}
-        idealData={idealData}
-        idealSensor="Pressure"
-        idealLabel="Ideal Pressure"
-        color="#9B59B6"
-        samplingRate={samplingRate}
-        isPressure={true}
-      />
-    </div>
-  );
-}
-
-// Individual Comparison Chart Component
-function ComparisonChart({ title, yourTestName, yourTestData, idealData, idealSensor, idealLabel, color, samplingRate, isPressure = false }) {
-  if (!yourTestData || !idealData) return null;
-
-  const sampled = idealData.filter((_, i) => i % samplingRate === 0);
-
-  // Your test data (convert Kelvin to Celsius for temperature)
-  const yourData = yourTestData.data.map(row => ({
-    time: row.Time,
-    value: isPressure ? row['case0.sav'] : (row['case0.sav'] - 273.15)
-  }));
-
-  // Calculate statistics
-  const yourValues = yourData.map(d => d.value);
-  const idealValues = sampled.map(row => row[idealSensor]).filter(v => v != null);
-
-  const yourStats = {
-    min: Math.min(...yourValues).toFixed(2),
-    max: Math.max(...yourValues).toFixed(2),
-    mean: (yourValues.reduce((a,b) => a+b, 0) / yourValues.length).toFixed(2),
-    range: (Math.max(...yourValues) - Math.min(...yourValues)).toFixed(2)
-  };
-
-  const idealStats = {
-    min: Math.min(...idealValues).toFixed(2),
-    max: Math.max(...idealValues).toFixed(2),
-    mean: (idealValues.reduce((a,b) => a+b, 0) / idealValues.length).toFixed(2),
-    range: (Math.max(...idealValues) - Math.min(...idealValues)).toFixed(2)
-  };
-
-  const deviation = Math.abs(parseFloat(yourStats.mean) - parseFloat(idealStats.mean)).toFixed(2);
-  const deviationPercent = ((deviation / parseFloat(idealStats.mean)) * 100).toFixed(1);
-
-  const traces = [
-    {
-      x: yourData.map(d => d.time),
-      y: yourData.map(d => d.value),
-      type: 'scatter',
-      mode: 'lines+markers',
-      name: `Thermal Desktop - ${yourTestName}`,
-      line: { color: color, width: 3 },
-      marker: { size: 6 }
-    },
-    {
-      x: sampled.map((_, i) => i * 10 * samplingRate), // Convert to seconds
-      y: sampled.map(row => row[idealSensor]),
-      type: 'scatter',
-      mode: 'lines',
-      name: `TVAC Test - ${idealLabel}`,
-      line: { color: '#888', width: 2, dash: 'dash' },
-      opacity: 0.7
-    }
-  ];
-
-  return (
-    <div style={chartContainerStyle}>
-      <h2 style={chartTitleStyle}>📊 {title}</h2>
-
-      {/* Statistics Comparison */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '15px', marginBottom: '20px' }}>
-        <div style={{ ...statCardStyle, background: 'rgba(100, 200, 255, 0.1)' }}>
-          <h4 style={{ color: color }}>Thermal Desktop</h4>
-          <p style={{ fontSize: '24px', fontWeight: 'bold' }}>{yourStats.mean}{isPressure ? ' mbar' : '°C'}</p>
-          <p style={{ fontSize: '12px', color: '#666' }}>Range: {yourStats.range}</p>
-        </div>
-        <div style={{ ...statCardStyle, background: 'rgba(150, 150, 150, 0.1)' }}>
-          <h4 style={{ color: '#888' }}>TVAC Test</h4>
-          <p style={{ fontSize: '24px', fontWeight: 'bold' }}>{idealStats.mean}{isPressure ? ' mbar' : '°C'}</p>
-          <p style={{ fontSize: '12px', color: '#666' }}>Range: {idealStats.range}</p>
-        </div>
-        <div style={{ ...statCardStyle, background: deviationPercent < 5 ? 'rgba(100, 255, 100, 0.1)' : 'rgba(255, 200, 100, 0.1)' }}>
-          <h4>Deviation</h4>
-          <p style={{ fontSize: '24px', fontWeight: 'bold' }}>{deviation}{isPressure ? ' mbar' : '°C'}</p>
-          <p style={{ fontSize: '12px', color: '#666' }}>{deviationPercent}% difference</p>
-        </div>
-        <div style={statCardStyle}>
-          <h4>Data Points</h4>
-          <p style={{ fontSize: '16px' }}>Simulation: {yourData.length}</p>
-          <p style={{ fontSize: '16px' }}>TVAC: {sampled.length}</p>
-        </div>
-      </div>
-
-      <Plot
-        data={traces}
-        layout={{
-          xaxis: { title: 'Time (seconds)' },
-          yaxis: { title: isPressure ? 'Pressure (mbar)' : 'Temperature (°C)' },
-          hovermode: 'closest',
-          height: 600,
-          margin: { l: 60, r: 40, t: 20, b: 60 },
-          paper_bgcolor: 'rgba(255,255,255,0.95)',
-          plot_bgcolor: 'rgba(255,255,255,0.95)',
-          legend: { orientation: 'h', y: -0.15 }
-        }}
-        config={{ responsive: true }}
-        style={{ width: '100%' }}
-      />
-
-      {/* Analysis Text */}
-      <div style={{ marginTop: '15px', padding: '15px', background: 'rgba(255,255,255,0.1)', borderRadius: '8px' }}>
-        <h4 style={{ marginBottom: '10px' }}>📈 Thermal Model Validation:</h4>
-        <ul style={{ lineHeight: '1.8', paddingLeft: '20px' }}>
-          <li>Thermal Desktop simulation: <strong>{yourStats.mean}{isPressure ? ' mbar' : '°C'}</strong> | TVAC test: <strong>{idealStats.mean}{isPressure ? ' mbar' : '°C'}</strong></li>
-          <li>Model deviation: <strong>{deviationPercent}%</strong> {deviationPercent < 5 ? '✓ Excellent - model validated for flight' : deviationPercent < 10 ? '⚠ Acceptable - minor refinement recommended' : '⚠ Significant - review thermal assumptions & material properties'}</li>
-          <li>Simulation range: {yourStats.range} | TVAC range: {idealStats.range}</li>
-          <li>{deviationPercent < 5 ? '✓ Thermal model accurately predicts on-orbit thermal behavior' : deviationPercent < 10 ? '⚠ Model suitable for preliminary mission planning' : '⚠ Model requires calibration before mission use'}</li>
-        </ul>
-      </div>
-    </div>
-  );
-}
-
-const chartContainerStyle = {
-  background: 'rgba(255, 255, 255, 0.95)',
-  borderRadius: '15px',
-  padding: '25px',
-  marginBottom: '30px',
-  boxShadow: '0 10px 30px rgba(0, 0, 0, 0.3)',
-  backdropFilter: 'blur(10px)'
-};
-
-const chartTitleStyle = {
-  fontSize: '1.8em',
-  color: '#333',
-  marginBottom: '20px',
-  paddingBottom: '10px',
-  borderBottom: '3px solid #667eea'
-};
-
-const statCardStyle = {
-  background: 'rgba(255, 255, 255, 0.15)',
-  padding: '15px',
-  borderRadius: '10px',
-  backdropFilter: 'blur(10px)',
-  textAlign: 'center'
-};
-
-const buttonStyle = {
-  padding: '10px 20px',
-  background: 'rgba(255, 255, 255, 0.2)',
-  border: '2px solid rgba(255, 255, 255, 0.5)',
-  borderRadius: '8px',
-  color: 'white',
-  cursor: 'pointer',
-  fontSize: '14px',
-  fontWeight: 'bold',
-  transition: 'all 0.3s',
-};
