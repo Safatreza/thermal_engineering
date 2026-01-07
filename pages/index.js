@@ -257,27 +257,49 @@ export default function Home() {
               type: 'scatter',
               mode: 'lines',
               name: 'TVAC Test',
-              line: { color: '#3b82f6', width: 2, simplify: true }
+              line: {
+                color: '#3b82f6',
+                width: 2,
+                shape: 'linear'
+              }
             },
             {
               x: simTimes,
               y: simTemps,
               type: 'scatter',
-              mode: 'lines',
-              name: 'Simulation',
-              line: { color: '#ef4444', width: 2, dash: 'dash', simplify: true }
+              mode: 'lines+markers',
+              name: 'Simulation (101 pts)',
+              line: {
+                color: '#ef4444',
+                width: 2.5,
+                shape: 'spline',
+                smoothing: 1.0
+              },
+              marker: {
+                color: '#ef4444',
+                size: 4,
+                symbol: 'circle'
+              }
             }
           ]}
           layout={{
             autosize: true,
-            height: 350,
+            height: 400,
             margin: { t: 10, r: 10, b: 40, l: 50 },
-            xaxis: { title: 'Time', showgrid: false },
-            yaxis: { title: 'Temperature (°C)' },
+            xaxis: {
+              title: 'Time',
+              showgrid: true,
+              gridcolor: '#e5e7eb'
+            },
+            yaxis: {
+              title: 'Temperature (°C)',
+              showgrid: true,
+              gridcolor: '#e5e7eb'
+            },
             legend: { orientation: 'h', y: -0.2 },
-            plot_bgcolor: '#f9fafb',
+            plot_bgcolor: '#ffffff',
             paper_bgcolor: 'transparent',
-            hovermode: 'closest'
+            hovermode: 'x unified'
           }}
           config={{ responsive: true, displayModeBar: false }}
           style={{ width: '100%' }}
@@ -355,33 +377,55 @@ export default function Home() {
               type: 'scatter',
               mode: 'lines',
               name: 'TVAC Pressure',
-              line: { color: '#3b82f6', width: 2, simplify: true }
+              line: {
+                color: '#3b82f6',
+                width: 2,
+                shape: 'linear'
+              }
             },
             {
               x: simTimes,
               y: simTemps,
               type: 'scatter',
-              mode: 'lines',
-              name: 'Sim Temp',
-              line: { color: '#ef4444', width: 2, dash: 'dash', simplify: true },
+              mode: 'lines+markers',
+              name: 'Simulation Temp (101 pts)',
+              line: {
+                color: '#ef4444',
+                width: 2.5,
+                shape: 'spline',
+                smoothing: 1.0
+              },
+              marker: {
+                color: '#ef4444',
+                size: 4
+              },
               yaxis: 'y2'
             }
           ]}
           layout={{
             autosize: true,
-            height: 350,
+            height: 400,
             margin: { t: 10, r: 50, b: 40, l: 50 },
-            xaxis: { title: 'Time', showgrid: false },
-            yaxis: { title: 'Pressure (mbar)' },
+            xaxis: {
+              title: 'Time',
+              showgrid: true,
+              gridcolor: '#e5e7eb'
+            },
+            yaxis: {
+              title: 'Pressure (mbar)',
+              showgrid: true,
+              gridcolor: '#e5e7eb'
+            },
             yaxis2: {
               title: 'Temp (°C)',
               overlaying: 'y',
-              side: 'right'
+              side: 'right',
+              showgrid: false
             },
             legend: { orientation: 'h', y: -0.2 },
-            plot_bgcolor: '#f9fafb',
+            plot_bgcolor: '#ffffff',
             paper_bgcolor: 'transparent',
-            hovermode: 'closest'
+            hovermode: 'x unified'
           }}
           config={{ responsive: true, displayModeBar: false }}
           style={{ width: '100%' }}
