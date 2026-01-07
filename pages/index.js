@@ -163,7 +163,7 @@ export default function Home() {
   };
 
   // Create simulation chart (full resolution) - convert Kelvin to Celsius
-  const createSimChart = (fileName, title, unit = '°C') => {
+  const createSimChart = (fileName, title, unit = '°C', color = '#ef4444') => {
     const data = simData[fileName];
     if (!data) {
       return (
@@ -195,32 +195,37 @@ export default function Home() {
     const min = Math.min(...temps);
     const max = Math.max(...temps);
 
+    // Convert time from seconds to hours for better readability
+    const timesInHours = times.map(t => t / 3600);
+
     return (
       <div style={{ marginBottom: '40px', background: 'rgba(255,255,255,0.95)', padding: '20px', borderRadius: '10px' }}>
         <h3 style={{ color: '#1f2937', marginBottom: '10px' }}>{title}</h3>
-        <div style={{ display: 'flex', gap: '20px', marginBottom: '10px', fontSize: '14px' }}>
+        <div style={{ display: 'flex', gap: '20px', marginBottom: '10px', fontSize: '14px', flexWrap: 'wrap' }}>
           <div><strong>Mean:</strong> {mean.toFixed(2)}{unit}</div>
           <div><strong>Min:</strong> {min.toFixed(2)}{unit}</div>
           <div><strong>Max:</strong> {max.toFixed(2)}{unit}</div>
           <div><strong>Range:</strong> {(max - min).toFixed(2)}{unit}</div>
-          <div style={{ color: '#6b7280' }}><strong>Points:</strong> {temps.length.toLocaleString()}</div>
+          <div><strong>Start:</strong> {temps[0].toFixed(2)}{unit}</div>
+          <div><strong>End:</strong> {temps[temps.length - 1].toFixed(2)}{unit}</div>
+          <div style={{ color: '#6b7280' }}><strong>Points:</strong> {temps.length}</div>
         </div>
         <Plot
           data={[{
-            x: times,
+            x: timesInHours,
             y: temps,
             type: 'scatter',
             mode: 'lines+markers',
             name: title,
             line: {
-              color: '#ef4444',
-              width: 2,
-              shape: 'spline',
-              smoothing: 1.0
+              color: color,
+              width: 2.5,
+              shape: 'linear'  // Changed from spline to linear to show actual data points
             },
             marker: {
-              color: '#ef4444',
-              size: 4
+              color: color,
+              size: 5,
+              symbol: 'circle'
             }
           }]}
           layout={{
@@ -228,7 +233,7 @@ export default function Home() {
             height: 450,
             margin: { t: 10, r: 10, b: 40, l: 60 },
             xaxis: {
-              title: 'Time (seconds)',
+              title: 'Time (hours)',
               showgrid: true,
               gridcolor: '#e5e7eb',
               gridwidth: 1
@@ -295,34 +300,50 @@ export default function Home() {
       <>
         {/* Base Plates */}
         <div style={{ background: 'rgba(255,255,255,0.95)', padding: '20px', borderRadius: '10px', marginBottom: '20px' }}>
-          <h2 style={{ color: '#1f2937', marginBottom: '20px' }}>Base Plate Simulations (Full Resolution - 101 points)</h2>
-          {createSimChart('BASEPLATE_1105', 'Base Plate 1105')}
-          {createSimChart('BASEPLATE_1106', 'Base Plate 1106')}
-          {createSimChart('BASEPLATE_1109', 'Base Plate 1109')}
-          {createSimChart('BASEPLATE_1110', 'Base Plate 1110')}
+          <h2 style={{ color: '#1f2937', marginBottom: '10px' }}>Base Plate Simulations</h2>
+          <p style={{ color: '#6b7280', fontSize: '14px', marginBottom: '20px' }}>
+            Note: All 4 baseplate variants show nearly identical thermal profiles (within 0.02°C).
+            Mean temp ~82.4°C, ranging from 20°C to 112.4°C over 48 hours.
+          </p>
+          {createSimChart('BASEPLATE_1105', 'Base Plate 1105', '°C', '#dc2626')}
+          {createSimChart('BASEPLATE_1106', 'Base Plate 1106', '°C', '#ea580c')}
+          {createSimChart('BASEPLATE_1109', 'Base Plate 1109', '°C', '#f59e0b')}
+          {createSimChart('BASEPLATE_1110', 'Base Plate 1110', '°C', '#f97316')}
         </div>
 
         {/* Solar Panels */}
         <div style={{ background: 'rgba(255,255,255,0.95)', padding: '20px', borderRadius: '10px', marginBottom: '20px' }}>
-          <h2 style={{ color: '#1f2937', marginBottom: '20px' }}>Solar Panel Simulations</h2>
-          {createSimChart('SOLARPANNEL_BOTTOM_LEFT_2309', 'Solar Panel 2309')}
-          {createSimChart('SOLARPANNEL_BOTTOM_LEFT_2310', 'Solar Panel 2310')}
-          {createSimChart('SOLARPANNEL_BOTTOM_LEFT_2313', 'Solar Panel 2313')}
-          {createSimChart('SOLARPANNEL_BOTTOM_LEFT_2314', 'Solar Panel 2314')}
+          <h2 style={{ color: '#1f2937', marginBottom: '10px' }}>Solar Panel Simulations</h2>
+          <p style={{ color: '#6b7280', fontSize: '14px', marginBottom: '20px' }}>
+            Solar panel variants show slight differences (0.5-1.5°C variation in mean temperatures).
+            Mean temps range from 74-75.5°C, all starting at 20°C and reaching peaks of 104-105°C.
+          </p>
+          {createSimChart('SOLARPANNEL_BOTTOM_LEFT_2309', 'Solar Panel 2309', '°C', '#16a34a')}
+          {createSimChart('SOLARPANNEL_BOTTOM_LEFT_2310', 'Solar Panel 2310', '°C', '#059669')}
+          {createSimChart('SOLARPANNEL_BOTTOM_LEFT_2313', 'Solar Panel 2313', '°C', '#0891b2')}
+          {createSimChart('SOLARPANNEL_BOTTOM_LEFT_2314', 'Solar Panel 2314', '°C', '#0284c7')}
         </div>
 
         {/* Components */}
         <div style={{ background: 'rgba(255,255,255,0.95)', padding: '20px', borderRadius: '10px', marginBottom: '20px' }}>
-          <h2 style={{ color: '#1f2937', marginBottom: '20px' }}>Component Simulations</h2>
-          {createSimChart('BODY_1254', 'Body 1254 (under MLI)')}
-          {createSimChart('RADIATOR_1300', 'Radiator 1300')}
+          <h2 style={{ color: '#1f2937', marginBottom: '10px' }}>Component Simulations</h2>
+          <p style={{ color: '#6b7280', fontSize: '14px', marginBottom: '20px' }}>
+            Body (MLI-protected) shows cooler profile (65°C mean, max 99°C) vs Radiator (81°C mean, max 111°C).
+            Radiator reaches similar peak temperatures to baseplates.
+          </p>
+          {createSimChart('BODY_1254', 'Body 1254 (under MLI)', '°C', '#7c3aed')}
+          {createSimChart('RADIATOR_1300', 'Radiator 1300', '°C', '#c026d3')}
         </div>
 
         {/* Pressure Chambers */}
         <div style={{ background: 'rgba(255,255,255,0.95)', padding: '20px', borderRadius: '10px', marginBottom: '20px' }}>
-          <h2 style={{ color: '#1f2937', marginBottom: '20px' }}>Pressure Chamber Simulations</h2>
-          {createSimChart('PRESSURECHAMBER_8000', 'Pressure Chamber 8000')}
-          {createSimChart('PRESSURECHAMBER_8150', 'Pressure Chamber 8150')}
+          <h2 style={{ color: '#1f2937', marginBottom: '10px' }}>Pressure Chamber Simulations</h2>
+          <p style={{ color: '#6b7280', fontSize: '14px', marginBottom: '20px' }}>
+            Both pressure chamber variants are IDENTICAL: Mean 38.6°C with thermal cycling between -20°C and +80°C.
+            This represents the TVAC chamber wall temperature profile during testing.
+          </p>
+          {createSimChart('PRESSURECHAMBER_8000', 'Pressure Chamber 8000', '°C', '#0f766e')}
+          {createSimChart('PRESSURECHAMBER_8150', 'Pressure Chamber 8150', '°C', '#0d9488')}
         </div>
       </>
     );
