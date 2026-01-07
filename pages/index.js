@@ -13,29 +13,45 @@ export default function Home() {
 
   // Load TVAC test data with sampling
   useEffect(() => {
-    Papa.parse('/data_moderate.csv', { // Use pre-compressed data
+    console.log('Loading TVAC data...');
+    Papa.parse('/data_moderate.csv', {
       download: true,
       header: true,
       dynamicTyping: true,
+      skipEmptyLines: true,
       complete: (result) => {
-        setTvacData(result.data);
+        console.log('TVAC data loaded:', result.data.length, 'rows');
+        if (result.data && result.data.length > 0) {
+          setTvacData(result.data);
+        } else {
+          console.error('No data in moderate CSV, trying full CSV');
+          loadFullTvacData();
+        }
       },
       error: (error) => {
-        console.error('Error loading TVAC data:', error);
-        // Fallback to full data if moderate doesn't exist
-        Papa.parse('/20251211_LPE_CC_Data_Export.csv', {
-          download: true,
-          header: true,
-          dynamicTyping: true,
-          skipEmptyLines: true,
-          complete: (result) => {
-            // Sample to 10% immediately
-            const sampled = result.data.filter((_, i) => i % 10 === 0);
-            setTvacData(sampled);
-          }
-        });
+        console.error('Error loading moderate TVAC data:', error);
+        loadFullTvacData();
       }
     });
+
+    function loadFullTvacData() {
+      Papa.parse('/20251211_LPE_CC_Data_Export.csv', {
+        download: true,
+        header: true,
+        dynamicTyping: true,
+        skipEmptyLines: true,
+        complete: (result) => {
+          console.log('Full TVAC data loaded:', result.data.length, 'rows');
+          // Sample to 10% immediately for performance
+          const sampled = result.data.filter((_, i) => i % 10 === 0);
+          console.log('Sampled to:', sampled.length, 'rows');
+          setTvacData(sampled);
+        },
+        error: (err) => {
+          console.error('Critical error loading TVAC data:', err);
+        }
+      });
+    }
   }, []);
 
   // Load simulation data lazily based on active section
@@ -48,26 +64,38 @@ export default function Home() {
     };
 
     const filesToLoad = sectionsMap[activeSection] || [];
+    console.log('Loading section:', activeSection, 'Files:', filesToLoad);
 
     filesToLoad.forEach(fileName => {
       // Skip if already loaded
-      if (simData[fileName]) return;
+      if (simData[fileName]) {
+        console.log('Already loaded:', fileName);
+        return;
+      }
 
-      Papa.parse(`/test_2/${fileName}.csv`, {
+      console.log('Loading simulation file:', fileName);
+      Papa.parse(`/${fileName}.csv`, { // Files are in public/ root
         download: true,
         header: true,
         dynamicTyping: true,
         skipEmptyLines: true,
         complete: (result) => {
-          setSimData(prev => ({ ...prev, [fileName]: result.data }));
+          console.log('Loaded', fileName, ':', result.data.length, 'rows');
+          if (result.data && result.data.length > 0) {
+            setSimData(prev => ({ ...prev, [fileName]: result.data }));
+          }
+        },
+        error: (err) => {
+          console.error('Error loading', fileName, ':', err);
         }
       });
     });
 
     if (loading && tvacData) {
+      console.log('Data ready, hiding loading screen');
       setLoading(false);
     }
-  }, [activeSection, tvacData]);
+  }, [activeSection, tvacData, loading, simData]);
 
   // Memoize sampled data to prevent recalculation
   const sampleData = useMemo(() => {
@@ -78,10 +106,17 @@ export default function Home() {
     };
   }, []);
 
-  // Calculate statistics
+  // Calculate statistics with validation
   const calculateStats = (simValues, tvacValues) => {
-    const simMean = simValues.reduce((a, b) => a + b, 0) / simValues.length;
-    const tvacMean = tvacValues.reduce((a, b) => a + b, 0) / tvacValues.length;
+    const validSimValues = simValues.filter(v => v != null && !isNaN(v) && isFinite(v));
+    const validTvacValues = tvacValues.filter(v => v != null && !isNaN(v) && isFinite(v));
+
+    if (validSimValues.length === 0 || validTvacValues.length === 0) {
+      return { simMean: 0, tvacMean: 0, deviation: 0 };
+    }
+
+    const simMean = validSimValues.reduce((a, b) => a + b, 0) / validSimValues.length;
+    const tvacMean = validTvacValues.reduce((a, b) => a + b, 0) / validTvacValues.length;
     const deviation = Math.abs(((simMean - tvacMean) / tvacMean) * 100);
     return { simMean, tvacMean, deviation };
   };
@@ -104,13 +139,31 @@ export default function Home() {
     const sampledTvac = sampleData(tvacData, dataScope);
     const sampledSim = simDataInput; // Simulation data is small (101 points)
 
-    // Extract TVAC data
-    const tvacDates = sampledTvac.map(row => row.Date);
-    const tvacTemps = sampledTvac.map(row => row[tvacTempColumn]);
+    // Extract TVAC data with validation
+    const tvacDates = sampledTvac.map(row => row.Date).filter(d => d != null);
+    const tvacTemps = sampledTvac.map(row => {
+      const val = row[tvacTempColumn];
+      return (val != null && !isNaN(val)) ? val : null;
+    }).filter(t => t != null);
 
     // Extract simulation data - convert Kelvin to Celsius
-    const simTimes = sampledSim.map(row => row.Time);
-    const simTemps = sampledSim.map(row => row['case2.sav'] ? row['case2.sav'] - 273.15 : null);
+    const simTimes = sampledSim.map(row => row.Time).filter(t => t != null);
+    const simTemps = sampledSim.map(row => {
+      const kelvin = row['case2.sav'];
+      if (kelvin != null && !isNaN(kelvin)) {
+        return kelvin - 273.15;
+      }
+      return null;
+    }).filter(t => t != null);
+
+    // Ensure we have data
+    if (tvacDates.length === 0 || simTimes.length === 0 || tvacTemps.length === 0 || simTemps.length === 0) {
+      return (
+        <div style={{ padding: '20px', background: 'rgba(255,255,255,0.9)', borderRadius: '10px', marginBottom: '20px' }}>
+          <p style={{ color: '#ef4444' }}>Error: No valid data for {title}</p>
+        </div>
+      );
+    }
 
     // Calculate statistics
     const stats = calculateStats(
@@ -184,13 +237,31 @@ export default function Home() {
     const sampledTvac = sampleData(tvacData, dataScope);
     const sampledSim = simDataInput;
 
-    // Extract TVAC pressure data
-    const tvacDates = sampledTvac.map(row => row.Date);
-    const tvacPressure = sampledTvac.map(row => row.Pressure);
+    // Extract TVAC pressure data with validation
+    const tvacDates = sampledTvac.map(row => row.Date).filter(d => d != null);
+    const tvacPressure = sampledTvac.map(row => {
+      const val = row.Pressure;
+      return (val != null && !isNaN(val)) ? val : null;
+    }).filter(p => p != null);
 
-    // Extract simulation pressure - convert Kelvin to Celsius (treating as temperature proxy)
-    const simTimes = sampledSim.map(row => row.Time);
-    const simTemps = sampledSim.map(row => row['case2.sav'] ? row['case2.sav'] - 273.15 : null);
+    // Extract simulation pressure - convert Kelvin to Celsius
+    const simTimes = sampledSim.map(row => row.Time).filter(t => t != null);
+    const simTemps = sampledSim.map(row => {
+      const kelvin = row['case2.sav'];
+      if (kelvin != null && !isNaN(kelvin)) {
+        return kelvin - 273.15;
+      }
+      return null;
+    }).filter(t => t != null);
+
+    // Ensure we have data
+    if (tvacDates.length === 0 || simTimes.length === 0 || tvacPressure.length === 0 || simTemps.length === 0) {
+      return (
+        <div style={{ padding: '20px', background: 'rgba(255,255,255,0.9)', borderRadius: '10px', marginBottom: '20px' }}>
+          <p style={{ color: '#ef4444' }}>Error: No valid data for {title}</p>
+        </div>
+      );
+    }
 
     // For pressure chambers, we'll compare temperature profiles
     const stats = calculateStats(
