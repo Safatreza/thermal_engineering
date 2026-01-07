@@ -8,7 +8,7 @@ export default function Home() {
   const [tvacData, setTvacData] = useState(null);
   const [simData, setSimData] = useState({});
   const [loading, setLoading] = useState(true);
-  const [activeView, setActiveView] = useState('tvac'); // 'tvac' or 'simulation'
+  const [activeView, setActiveView] = useState('tvac'); // 'tvac', 'simulation', or 'comparison'
 
   // Load FULL RESOLUTION TVAC test data
   useEffect(() => {
@@ -349,6 +349,255 @@ export default function Home() {
     );
   };
 
+  // Render comparison view with analytical summary
+  const renderComparisonView = () => {
+    if (!tvacData || Object.keys(simData).length === 0) {
+      return (
+        <div style={{ background: 'rgba(255,255,255,0.95)', padding: '20px', borderRadius: '10px' }}>
+          <h2 style={{ color: '#1f2937' }}>Loading comparison data...</h2>
+        </div>
+      );
+    }
+
+    // Calculate TVAC statistics
+    const tvacStats = {
+      temp1: { data: tvacData.map(r => r.Temp1).filter(v => v != null), name: 'Top Plate (BASEPLATE_1106)' },
+      temp2: { data: tvacData.map(r => r.Temp2).filter(v => v != null), name: 'Solar Panel (SOLARPANNEL_2309)' },
+      temp3: { data: tvacData.map(r => r.Temp3).filter(v => v != null), name: 'Body under MLI (BODY_1254)' },
+      temp4: { data: tvacData.map(r => r.Temp4).filter(v => v != null), name: 'Radiator (RADIATOR_1300)' }
+    };
+
+    // Calculate simulation statistics
+    const getSimStats = (fileName) => {
+      const data = simData[fileName];
+      if (!data) return null;
+      const temps = data.map(row => row['case2.sav'] - 273.15).filter(t => t != null);
+      return {
+        mean: temps.reduce((a, b) => a + b, 0) / temps.length,
+        min: Math.min(...temps),
+        max: Math.max(...temps)
+      };
+    };
+
+    const simStats = {
+      baseplate: getSimStats('BASEPLATE_1106'),
+      solarpanel: getSimStats('SOLARPANNEL_BOTTOM_LEFT_2309'),
+      body: getSimStats('BODY_1254'),
+      radiator: getSimStats('RADIATOR_1300')
+    };
+
+    // Calculate comparisons
+    const calculateComparison = (tvacArr, simStat) => {
+      if (!simStat) return null;
+      const tvacMean = tvacArr.reduce((a, b) => a + b, 0) / tvacArr.length;
+      const tvacMin = Math.min(...tvacArr);
+      const tvacMax = Math.max(...tvacArr);
+
+      return {
+        tvacMean: tvacMean.toFixed(2),
+        simMean: simStat.mean.toFixed(2),
+        tvacMin: tvacMin.toFixed(2),
+        simMin: simStat.min.toFixed(2),
+        tvacMax: tvacMax.toFixed(2),
+        simMax: simStat.max.toFixed(2),
+        meanDeviation: Math.abs(((simStat.mean - tvacMean) / tvacMean) * 100).toFixed(1),
+        meanDiff: (simStat.mean - tvacMean).toFixed(2)
+      };
+    };
+
+    const comparisons = {
+      baseplate: calculateComparison(tvacStats.temp1.data, simStats.baseplate),
+      solarpanel: calculateComparison(tvacStats.temp2.data, simStats.solarpanel),
+      body: calculateComparison(tvacStats.temp3.data, simStats.body),
+      radiator: calculateComparison(tvacStats.temp4.data, simStats.radiator)
+    };
+
+    const getStatusColor = (deviation) => {
+      const dev = parseFloat(deviation);
+      if (dev < 5) return '#10b981';
+      if (dev < 10) return '#f59e0b';
+      return '#ef4444';
+    };
+
+    const getStatusLabel = (deviation) => {
+      const dev = parseFloat(deviation);
+      if (dev < 5) return 'Valid (<5%)';
+      if (dev < 10) return 'Acceptable (5-10%)';
+      return 'Review (>10%)';
+    };
+
+    return (
+      <>
+        {/* Summary Overview */}
+        <div style={{ background: 'rgba(255,255,255,0.95)', padding: '30px', borderRadius: '10px', marginBottom: '20px' }}>
+          <h2 style={{ color: '#1f2937', marginBottom: '20px' }}>Analytical Comparison Summary</h2>
+          <p style={{ color: '#6b7280', fontSize: '15px', lineHeight: '1.6', marginBottom: '20px' }}>
+            This analysis compares TVAC test measurements (32,448 points over 3.76 days) with Thermal Desktop simulation predictions
+            (101 points over 48 hours). Deviations indicate how well the thermal model matches actual hardware performance.
+          </p>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}>
+            {Object.entries(comparisons).map(([key, comp]) => {
+              if (!comp) return null;
+              const status = getStatusLabel(comp.meanDeviation);
+              const color = getStatusColor(comp.meanDeviation);
+
+              return (
+                <div key={key} style={{
+                  background: '#f9fafb',
+                  padding: '20px',
+                  borderRadius: '8px',
+                  border: `3px solid ${color}`
+                }}>
+                  <h3 style={{ color: '#1f2937', fontSize: '16px', marginBottom: '10px' }}>
+                    {key === 'baseplate' && 'Top Plate / Baseplate'}
+                    {key === 'solarpanel' && 'Solar Panel'}
+                    {key === 'body' && 'Body (under MLI)'}
+                    {key === 'radiator' && 'Radiator'}
+                  </h3>
+                  <div style={{
+                    background: color,
+                    color: '#fff',
+                    padding: '8px 12px',
+                    borderRadius: '6px',
+                    fontWeight: 'bold',
+                    marginBottom: '15px',
+                    textAlign: 'center'
+                  }}>
+                    {status}
+                  </div>
+                  <div style={{ fontSize: '14px', lineHeight: '1.8' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                      <span style={{ color: '#6b7280' }}>Mean Deviation:</span>
+                      <span style={{ color: color, fontWeight: 'bold' }}>{comp.meanDeviation}%</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                      <span style={{ color: '#6b7280' }}>Temperature Diff:</span>
+                      <span style={{ fontWeight: 'bold' }}>{comp.meanDiff}°C</span>
+                    </div>
+                    <hr style={{ margin: '10px 0', border: 'none', borderTop: '1px solid #e5e7eb' }} />
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
+                      <span style={{ color: '#6b7280' }}>TVAC Mean:</span>
+                      <span>{comp.tvacMean}°C</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
+                      <span style={{ color: '#6b7280' }}>Sim Mean:</span>
+                      <span>{comp.simMean}°C</span>
+                    </div>
+                    <hr style={{ margin: '10px 0', border: 'none', borderTop: '1px solid #e5e7eb' }} />
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
+                      <span style={{ color: '#6b7280' }}>TVAC Range:</span>
+                      <span>{comp.tvacMin}°C to {comp.tvacMax}°C</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: '#6b7280' }}>Sim Range:</span>
+                      <span>{comp.simMin}°C to {comp.simMax}°C</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Detailed Analysis */}
+        <div style={{ background: 'rgba(255,255,255,0.95)', padding: '30px', borderRadius: '10px', marginBottom: '20px' }}>
+          <h2 style={{ color: '#1f2937', marginBottom: '20px' }}>Detailed Component Analysis</h2>
+
+          {/* Top Plate / Baseplate */}
+          {comparisons.baseplate && (
+            <div style={{ marginBottom: '30px', paddingBottom: '30px', borderBottom: '2px solid #e5e7eb' }}>
+              <h3 style={{ color: '#1f2937', marginBottom: '15px' }}>1. Top Plate / Baseplate 1106</h3>
+              <p style={{ color: '#6b7280', fontSize: '14px', lineHeight: '1.6', marginBottom: '10px' }}>
+                <strong>Mean Temperature Comparison:</strong> TVAC measured {comparisons.baseplate.tvacMean}°C average,
+                while simulation predicted {comparisons.baseplate.simMean}°C (difference: {comparisons.baseplate.meanDiff}°C,
+                deviation: {comparisons.baseplate.meanDeviation}%).
+              </p>
+              <p style={{ color: '#6b7280', fontSize: '14px', lineHeight: '1.6' }}>
+                <strong>Analysis:</strong> {parseFloat(comparisons.baseplate.meanDeviation) < 5 ?
+                  'Excellent agreement! Thermal model accurately represents baseplate thermal behavior.' :
+                  parseFloat(comparisons.baseplate.meanDeviation) < 10 ?
+                  'Acceptable agreement. Minor refinement of thermal properties recommended.' :
+                  'Significant deviation detected. Review thermal desktop assumptions: contact conductances, material properties, or boundary conditions.'}
+              </p>
+            </div>
+          )}
+
+          {/* Solar Panel */}
+          {comparisons.solarpanel && (
+            <div style={{ marginBottom: '30px', paddingBottom: '30px', borderBottom: '2px solid #e5e7eb' }}>
+              <h3 style={{ color: '#1f2937', marginBottom: '15px' }}>2. Solar Panel 2309</h3>
+              <p style={{ color: '#6b7280', fontSize: '14px', lineHeight: '1.6', marginBottom: '10px' }}>
+                <strong>Mean Temperature Comparison:</strong> TVAC measured {comparisons.solarpanel.tvacMean}°C average,
+                while simulation predicted {comparisons.solarpanel.simMean}°C (difference: {comparisons.solarpanel.meanDiff}°C,
+                deviation: {comparisons.solarpanel.meanDeviation}%).
+              </p>
+              <p style={{ color: '#6b7280', fontSize: '14px', lineHeight: '1.6' }}>
+                <strong>Analysis:</strong> {parseFloat(comparisons.solarpanel.meanDeviation) < 5 ?
+                  'Excellent agreement! Solar panel thermal model is well-calibrated.' :
+                  parseFloat(comparisons.solarpanel.meanDeviation) < 10 ?
+                  'Acceptable agreement. Consider refining solar absorptivity/emissivity values.' :
+                  'Significant deviation. Solar panels show highest variability - review optical properties, mounting interfaces, and solar flux assumptions.'}
+              </p>
+            </div>
+          )}
+
+          {/* Body under MLI */}
+          {comparisons.body && (
+            <div style={{ marginBottom: '30px', paddingBottom: '30px', borderBottom: '2px solid #e5e7eb' }}>
+              <h3 style={{ color: '#1f2937', marginBottom: '15px' }}>3. Body under MLI (1254)</h3>
+              <p style={{ color: '#6b7280', fontSize: '14px', lineHeight: '1.6', marginBottom: '10px' }}>
+                <strong>Mean Temperature Comparison:</strong> TVAC measured {comparisons.body.tvacMean}°C average,
+                while simulation predicted {comparisons.body.simMean}°C (difference: {comparisons.body.meanDiff}°C,
+                deviation: {comparisons.body.meanDeviation}%).
+              </p>
+              <p style={{ color: '#6b7280', fontSize: '14px', lineHeight: '1.6' }}>
+                <strong>Analysis:</strong> {parseFloat(comparisons.body.meanDeviation) < 5 ?
+                  'Excellent agreement! MLI insulation model is accurate.' :
+                  parseFloat(comparisons.body.meanDeviation) < 10 ?
+                  'Acceptable agreement. MLI performance within expected tolerances.' :
+                  'MLI-protected body shows deviation - verify MLI layer count, effective emissivity, and internal heat generation assumptions.'}
+              </p>
+            </div>
+          )}
+
+          {/* Radiator */}
+          {comparisons.radiator && (
+            <div style={{ marginBottom: '0' }}>
+              <h3 style={{ color: '#1f2937', marginBottom: '15px' }}>4. Radiator 1300</h3>
+              <p style={{ color: '#6b7280', fontSize: '14px', lineHeight: '1.6', marginBottom: '10px' }}>
+                <strong>Mean Temperature Comparison:</strong> TVAC measured {comparisons.radiator.tvacMean}°C average,
+                while simulation predicted {comparisons.radiator.simMean}°C (difference: {comparisons.radiator.meanDiff}°C,
+                deviation: {comparisons.radiator.meanDeviation}%).
+              </p>
+              <p style={{ color: '#6b7280', fontSize: '14px', lineHeight: '1.6' }}>
+                <strong>Analysis:</strong> {parseFloat(comparisons.radiator.meanDeviation) < 5 ?
+                  'Excellent agreement! Radiator thermal rejection model is validated.' :
+                  parseFloat(comparisons.radiator.meanDeviation) < 10 ?
+                  'Acceptable agreement. Radiator performing within expected range.' :
+                  'Radiator shows deviation - review surface finish, view factors to space, and conductive coupling to hot components.'}
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Recommendations */}
+        <div style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', padding: '30px', borderRadius: '10px', color: '#fff' }}>
+          <h2 style={{ marginBottom: '20px' }}>Recommendations for Thermal Model Improvement</h2>
+          <ul style={{ lineHeight: '1.8', fontSize: '15px' }}>
+            <li><strong>High Priority:</strong> Components with &gt;10% deviation require immediate attention to thermal desktop assumptions</li>
+            <li><strong>Material Properties:</strong> Verify thermal conductivities, specific heats, and densities match as-built hardware</li>
+            <li><strong>Contact Conductances:</strong> Review all mechanical interfaces -bolted joints typically range 500-5000 W/m²K</li>
+            <li><strong>Optical Properties:</strong> Confirm solar absorptivity (α) and infrared emissivity (ε) match actual surface finishes</li>
+            <li><strong>Boundary Conditions:</strong> Validate TVAC shroud temperatures, solar flux, and internal heat dissipation rates</li>
+            <li><strong>MLI Performance:</strong> Effective emissivity should be 0.03-0.05 for well-installed multi-layer insulation</li>
+            <li><strong>Transient Response:</strong> Large temperature swings suggest reviewing thermal mass and time constants</li>
+          </ul>
+        </div>
+      </>
+    );
+  };
+
   return (
     <div style={{
       minHeight: '100vh',
@@ -362,7 +611,9 @@ export default function Home() {
             CubeSat Thermal Desktop Validation
           </h1>
           <p style={{ color: '#6b7280', marginBottom: '20px' }}>
-            {activeView === 'tvac' ? 'TVAC Test Data Analysis (32,448 points)' : 'Thermal Desktop Simulation Results (101 points each)'}
+            {activeView === 'tvac' ? 'TVAC Test Data Analysis (32,448 points)' :
+             activeView === 'simulation' ? 'Thermal Desktop Simulation Results (101 points each)' :
+             'Comparative Analysis: TVAC vs Simulation'}
           </p>
 
           {/* View Tabs */}
@@ -397,11 +648,28 @@ export default function Home() {
             >
               Our Simulation Results
             </button>
+            <button
+              onClick={() => setActiveView('comparison')}
+              style={{
+                padding: '12px 24px',
+                background: activeView === 'comparison' ? '#2563eb' : '#e5e7eb',
+                color: activeView === 'comparison' ? '#fff' : '#1f2937',
+                border: 'none',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontWeight: 'bold',
+                fontSize: '16px'
+              }}
+            >
+              Comparison & Analysis
+            </button>
           </div>
         </div>
 
         {/* Active View */}
-        {activeView === 'tvac' ? renderTvacView() : renderSimulationView()}
+        {activeView === 'tvac' ? renderTvacView() :
+         activeView === 'simulation' ? renderSimulationView() :
+         renderComparisonView()}
       </div>
     </div>
   );
