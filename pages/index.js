@@ -8,7 +8,7 @@ export default function Home() {
   const [tvacData, setTvacData] = useState(null);
   const [simData, setSimData] = useState({});
   const [loading, setLoading] = useState(true);
-  const [activeView, setActiveView] = useState('tvac'); // 'tvac', 'simulation', or 'comparison'
+  const [activeView, setActiveView] = useState('tvac'); // 'tvac', 'simulation', 'comparison', or 'overlay'
 
   // Load FULL RESOLUTION TVAC test data
   useEffect(() => {
@@ -598,6 +598,199 @@ export default function Home() {
     );
   };
 
+  // Render overlay comparison view - both datasets on same timeline
+  const renderOverlayView = () => {
+    if (!tvacData || Object.keys(simData).length === 0) {
+      return (
+        <div style={{ background: 'rgba(255,255,255,0.95)', padding: '20px', borderRadius: '10px' }}>
+          <h2 style={{ color: '#1f2937' }}>Loading overlay comparison data...</h2>
+        </div>
+      );
+    }
+
+    // Create overlay chart for a component
+    const createOverlayChart = (tvacColumn, simFileName, title) => {
+      const simFile = simData[simFileName];
+      if (!simFile) return null;
+
+      // Get first 48 hours of TVAC data (17,280 points)
+      const hours48 = 48 * 3600; // 48 hours in seconds
+      const points48h = Math.floor(hours48 / 10); // TVAC samples every 10 seconds
+      const tvac48h = tvacData.slice(0, points48h);
+
+      // Extract TVAC data - convert to time in hours from start
+      const tvacTimes = tvac48h.map((_, idx) => (idx * 10) / 3600); // Convert to hours
+      const tvacTemps = tvac48h.map(row => row[tvacColumn]).filter(t => t != null);
+
+      // Extract simulation data - convert to hours and Kelvin to Celsius
+      const simTimes = simFile.map(row => row.Time / 3600).filter(t => t != null); // Convert to hours
+      const simTemps = simFile.map(row => {
+        const kelvin = row['case2.sav'];
+        return (kelvin != null && !isNaN(kelvin)) ? kelvin - 273.15 : null;
+      }).filter(t => t != null);
+
+      if (tvacTimes.length === 0 || simTimes.length === 0) {
+        return (
+          <div style={{ padding: '20px', background: 'rgba(255,255,255,0.9)', borderRadius: '10px', marginBottom: '20px' }}>
+            <p style={{ color: '#ef4444' }}>Error: No valid data for {title}</p>
+          </div>
+        );
+      }
+
+      // Calculate statistics
+      const tvacMean = tvacTemps.reduce((a, b) => a + b, 0) / tvacTemps.length;
+      const simMean = simTemps.reduce((a, b) => a + b, 0) / simTemps.length;
+      const deviation = Math.abs(((simMean - tvacMean) / tvacMean) * 100);
+
+      const getStatusColor = () => {
+        if (deviation < 5) return '#10b981';
+        if (deviation < 10) return '#f59e0b';
+        return '#ef4444';
+      };
+
+      const getStatusLabel = () => {
+        if (deviation < 5) return 'Valid (<5%)';
+        if (deviation < 10) return 'Acceptable (5-10%)';
+        return 'Review (>10%)';
+      };
+
+      return (
+        <div style={{ marginBottom: '40px', background: 'rgba(255,255,255,0.95)', padding: '20px', borderRadius: '10px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', flexWrap: 'wrap', gap: '10px' }}>
+            <h3 style={{ color: '#1f2937', margin: 0 }}>{title}</h3>
+            <div style={{
+              background: getStatusColor(),
+              color: '#fff',
+              padding: '6px 16px',
+              borderRadius: '6px',
+              fontWeight: 'bold',
+              fontSize: '14px'
+            }}>
+              {getStatusLabel()} - {deviation.toFixed(1)}% Deviation
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: '30px', marginBottom: '15px', fontSize: '14px', flexWrap: 'wrap' }}>
+            <div>
+              <strong style={{ color: '#3b82f6' }}>TVAC Mean:</strong> {tvacMean.toFixed(2)}°C
+              <span style={{ color: '#6b7280', marginLeft: '10px' }}>({tvacTemps.length.toLocaleString()} points)</span>
+            </div>
+            <div>
+              <strong style={{ color: '#ef4444' }}>Simulation Mean:</strong> {simMean.toFixed(2)}°C
+              <span style={{ color: '#6b7280', marginLeft: '10px' }}>({simTemps.length} points)</span>
+            </div>
+            <div>
+              <strong>Difference:</strong> {(simMean - tvacMean).toFixed(2)}°C
+            </div>
+          </div>
+
+          <Plot
+            data={[
+              {
+                x: tvacTimes,
+                y: tvacTemps,
+                type: 'scatter',
+                mode: 'lines',
+                name: 'TVAC Test (Actual)',
+                line: {
+                  color: '#3b82f6',
+                  width: 2
+                }
+              },
+              {
+                x: simTimes,
+                y: simTemps,
+                type: 'scatter',
+                mode: 'lines+markers',
+                name: 'Simulation (Predicted)',
+                line: {
+                  color: '#ef4444',
+                  width: 2.5,
+                  dash: 'dot'
+                },
+                marker: {
+                  color: '#ef4444',
+                  size: 6,
+                  symbol: 'circle'
+                }
+              }
+            ]}
+            layout={{
+              autosize: true,
+              height: 500,
+              margin: { t: 10, r: 10, b: 60, l: 60 },
+              xaxis: {
+                title: 'Time (hours) - First 48 Hours of Test',
+                showgrid: true,
+                gridcolor: '#e5e7eb',
+                gridwidth: 1,
+                range: [0, 48]
+              },
+              yaxis: {
+                title: 'Temperature (°C)',
+                showgrid: true,
+                gridcolor: '#e5e7eb',
+                gridwidth: 1
+              },
+              plot_bgcolor: '#f9fafb',
+              paper_bgcolor: 'transparent',
+              hovermode: 'x unified',
+              legend: {
+                x: 0.02,
+                y: 0.98,
+                bgcolor: 'rgba(255,255,255,0.9)',
+                bordercolor: '#e5e7eb',
+                borderwidth: 1
+              }
+            }}
+            config={{ responsive: true, displayModeBar: true }}
+            style={{ width: '100%' }}
+          />
+        </div>
+      );
+    };
+
+    return (
+      <>
+        {/* Info Section */}
+        <div style={{ background: 'rgba(255,255,255,0.95)', padding: '30px', borderRadius: '10px', marginBottom: '20px' }}>
+          <h2 style={{ color: '#1f2937', marginBottom: '15px' }}>Time-Aligned Overlay Comparison</h2>
+          <p style={{ color: '#6b7280', fontSize: '15px', lineHeight: '1.6', marginBottom: '15px' }}>
+            This view overlays TVAC test measurements with simulation predictions on the same timeline.
+            <strong> Blue lines show actual TVAC test data</strong> (17,280 points over first 48 hours),
+            while <strong>red dotted lines show simulation predictions</strong> (101 points over 48 hours).
+          </p>
+          <p style={{ color: '#6b7280', fontSize: '15px', lineHeight: '1.6' }}>
+            Both datasets are aligned to start at time zero and span exactly 48 hours, allowing direct
+            visual comparison of thermal behavior. Deviations between curves indicate model accuracy.
+          </p>
+        </div>
+
+        {/* Overlay Charts */}
+        <div style={{ background: 'rgba(255,255,255,0.95)', padding: '20px', borderRadius: '10px', marginBottom: '20px' }}>
+          <h2 style={{ color: '#1f2937', marginBottom: '20px' }}>Component Comparisons (48-Hour Window)</h2>
+          {createOverlayChart('Temp1', 'BASEPLATE_1106', '1. Top Plate / Baseplate 1106')}
+          {createOverlayChart('Temp2', 'SOLARPANNEL_BOTTOM_LEFT_2309', '2. Solar Panel 2309')}
+          {createOverlayChart('Temp3', 'BODY_1254', '3. Body under MLI (1254)')}
+          {createOverlayChart('Temp4', 'RADIATOR_1300', '4. Radiator 1300')}
+        </div>
+
+        {/* Key Insights */}
+        <div style={{ background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)', padding: '30px', borderRadius: '10px', color: '#fff' }}>
+          <h2 style={{ marginBottom: '20px' }}>Key Insights from Overlay Analysis</h2>
+          <ul style={{ lineHeight: '1.8', fontSize: '15px' }}>
+            <li><strong>Curve Shape:</strong> Compare thermal cycling patterns - do simulation and test follow similar heating/cooling profiles?</li>
+            <li><strong>Peak Temperatures:</strong> Check if maximum temperatures align between test and simulation</li>
+            <li><strong>Transient Response:</strong> Observe how quickly components heat up and cool down - simulation should match test dynamics</li>
+            <li><strong>Steady-State Behavior:</strong> Look for plateaus where temperatures stabilize - verify thermal equilibrium matches</li>
+            <li><strong>Phase Alignment:</strong> Hot and cold phases should occur at the same times in both datasets</li>
+            <li><strong>Deviation Patterns:</strong> Consistent offset suggests systematic error (material properties), while shape differences indicate dynamic modeling issues (thermal mass, contact resistance)</li>
+          </ul>
+        </div>
+      </>
+    );
+  };
+
   return (
     <div style={{
       minHeight: '100vh',
@@ -613,7 +806,8 @@ export default function Home() {
           <p style={{ color: '#6b7280', marginBottom: '20px' }}>
             {activeView === 'tvac' ? 'TVAC Test Data Analysis (32,448 points)' :
              activeView === 'simulation' ? 'Thermal Desktop Simulation Results (101 points each)' :
-             'Comparative Analysis: TVAC vs Simulation'}
+             activeView === 'comparison' ? 'Comparative Analysis: TVAC vs Simulation' :
+             'Time-Aligned Overlay: Test vs Prediction'}
           </p>
 
           {/* View Tabs */}
@@ -663,13 +857,29 @@ export default function Home() {
             >
               Comparison & Analysis
             </button>
+            <button
+              onClick={() => setActiveView('overlay')}
+              style={{
+                padding: '12px 24px',
+                background: activeView === 'overlay' ? '#2563eb' : '#e5e7eb',
+                color: activeView === 'overlay' ? '#fff' : '#1f2937',
+                border: 'none',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontWeight: 'bold',
+                fontSize: '16px'
+              }}
+            >
+              Overlay Graphs
+            </button>
           </div>
         </div>
 
         {/* Active View */}
         {activeView === 'tvac' ? renderTvacView() :
          activeView === 'simulation' ? renderSimulationView() :
-         renderComparisonView()}
+         activeView === 'comparison' ? renderComparisonView() :
+         renderOverlayView()}
       </div>
     </div>
   );
